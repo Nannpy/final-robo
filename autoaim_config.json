@@ -1,0 +1,37 @@
+{
+  "hsv": {
+    "red": {
+      "h_min": 170,
+      "h_max": 10,
+      "s_min": 120,
+      "s_max": 255,
+      "v_min": 70,
+      "v_max": 255
+    },
+    "green": {
+      "h_min": 35,
+      "h_max": 90,
+      "s_min": 109,
+      "s_max": 255,
+      "v_min": 30,
+      "v_max": 255
+    },
+    "blue": {
+      "h_min": 95,
+      "h_max": 130,
+      "s_min": 70,
+      "s_max": 255,
+      "v_min": 50,
+      "v_max": 255
+    },
+    "yellow": {
+      "h_min": 20,
+      "h_max": 35,
+      "s_min": 153,
+      "s_max": 255,
+      "v_min": 100,
+      "v_max": 255
+    }
+  },
+  "user_blind_zones": []
+}
