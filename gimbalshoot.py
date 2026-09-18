@@ -1,36 +1,44 @@
 """
-RoboMaster EP - ตรวจจับเป้าหมายสี + รูปทรงเรขาคณิต แล้วเล็งและยิงอัตโนมัติ
+RoboMaster EP - ตรวจจับป้ายสี แล้วยิงทุกเป้าต่อเนื่องตามลำดับสีที่เลือก
 
-ลำดับการทำงาน
-  1. เชื่อมต่อหุ่น -> ดับไฟ Top/Blaster -> Recenter Gimbal -> เปิดกล้อง
-  2. Setup Phase : ลากเมาส์วาดกรอบพื้นที่ตาบอดเพิ่มเติม
-  3. Tuning Phase: จูน HSV ทีละสี แดง -> เขียว -> น้ำเงิน -> เหลือง แล้วตรวจรวมทุกสีอีกหน้า
-  4. Recenter แล้วเข้า Loop หลัก (เริ่มที่โหมด PREVIEW รอคำสั่ง)
+รวมของสองคน: ลอจิกจับป้ายสีและค่าการเล็ง/ล็อกเป้าจากโค้ดเพื่อน (grimball_shoot_3targets: vision.py, control.py)
++ โปรแกรม GUI หน้าต่างเดียว, calibrate, เลือกลำดับยิง และภารกิจกวาดหาเป้าจากไฟล์นี้
 
-โหมดใน Loop หลัก
-  PREVIEW : Gimbal นิ่ง แสดงเป้าทุกสีที่มองเห็น
-  TRACK   : เล็ง/ยิงเฉพาะสีที่เลือก
-  MISSION : กวาดหัวหาเป้ารอบตัว แล้วยิงทุกเป้าตามลำดับสี แดง -> เขียว -> น้ำเงิน -> เหลือง
-            (สีเดียวกันยิงจากซ้ายไปขวา) ถ้า Auto-Fire ปิดอยู่ = ซ้อมเล็งอย่างเดียว ไม่ยิง
+วิธีรัน
+  python gimbalshoot.py --calibrate : วาดพื้นที่ตาบอด + จูนสีครบทุกสี แล้วบันทึก (ทำครั้งแรก หรือเมื่อแสงเปลี่ยน)
+  python gimbalshoot.py             : ใช้ค่าที่ calibrate ไว้ เข้าหน้า READY เลือกลำดับแล้วยิงได้ทันที
+  (รันครั้งแรกที่ยังไม่มีไฟล์ config จะเข้าโหมด calibrate ให้อัตโนมัติ)
 
-ปุ่มควบคุม (ต้องคลิกเลือกหน้าต่างภาพก่อน)
-  m             : เริ่มภารกิจยิงทุกเป้าทุกสี
-  r / g / b / y : โหมด TRACK สีนั้น (ถ้าเปิดจูนอยู่ = สลับสีที่จะจูน)
-  x / SPACE     : หยุด กลับโหมด PREVIEW (ยกเลิกภารกิจ)
-  s             : เปิด/ปิด Auto-Fire (Safety Toggle)
-  t             : เปิด/ปิด Live HSV Tuning (ระหว่างจูน ระบบยิงถูกล็อก)
-  c             : Recenter Gimbal
-  q / ESC       : ออกจากโปรแกรมอย่างปลอดภัย
+ทุกอย่างอยู่ในหน้าต่างเดียว (1280x720): ภาพกล้องซ้ายบน, แผงปุ่มด้านขวา, แถบล่างเป็น slider จูนสี/ผลภารกิจ
+คลิกปุ่มด้วยเมาส์ หรือใช้ปุ่มลัดคีย์บอร์ดที่เขียนในวงเล็บบนปุ่มก็ได้ (ต้องคลิกเลือกหน้าต่างก่อน)
 
-ค่า HSV ที่จูนและพื้นที่ตาบอดที่วาด จะถูกบันทึกไว้ใน autoaim_config.json ข้างไฟล์นี้
+หน้าจอ
+  SETUP   (calibrate 1/2): ลากเมาส์บนภาพกล้อง = วาดกรอบพื้นที่ตาบอด       [u] ลบกรอบล่าสุด [x] ล้าง [ENTER] ถัดไป
+  TUNE    (calibrate 2/2): เลือกสี แล้วลาก slider H/S/V จนภาพ MASK เห็นแต่เป้า
+                           [r/g/b/y] เลือกสี [v] ตรวจรวมทุกสี [n/ENTER] ถัดไป [p] ย้อน [t] บันทึก
+                           [i/k/j/l] หันหัว ขึ้น/ลง/ซ้าย/ขวา [c] หันกลับตรง
+  READY                  : [r/g/b/y] เรียงลำดับสีที่จะยิง (คลิกสีแรก = เริ่มลำดับใหม่, คลิกซ้ำ = เอาออก)
+                           [u/Backspace] ลบตัวท้าย [x] ล้าง [ENTER] เริ่มยิง [d] ซ้อมเล็งไม่ยิง
+                           [t] จูนสี [c] หันกลับตรง  ปุ่ม CALIBRATE ALL = วาดพื้นที่ตาบอด + จูนใหม่ทั้งหมด
+  MISSION                : กวาดหัวหาเป้ารอบตัว แล้วยิงทุกเป้าต่อกันตามลำดับสี (สีเดียวกันยิงซ้ายไปขวา)
+                           [x/SPACE] หยุดทันที [s] เปิด/ปิดระบบยิง [c] หยุดแล้วหันกลับตรง
+  ทุกหน้า                 : [q/ESC] ออกจากโปรแกรมอย่างปลอดภัย
+
+ค่า HSV, พื้นที่ตาบอด และลำดับยิงล่าสุด บันทึกไว้ใน autoaim_config.json ข้างไฟล์นี้
+(หน้า SETUP/TUNE บันทึกเมื่อกด SAVE & FINISH เท่านั้น)
 """
+import argparse
 import json
 import math
 import queue
+import textwrap
+import threading
 import time
-from dataclasses import asdict, dataclass, field, fields
+from collections import deque
+from dataclasses import asdict, dataclass, field, fields, replace
+from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Callable, Dict, List, Optional, Set, Tuple
 
 import cv2
 import numpy as np
@@ -45,7 +53,7 @@ Zone = Tuple[float, float, float, float]
 # ==========================================
 # --- การเชื่อมต่อ / กล้อง ---
 CONN_TYPE = "ap"                # "ap" = ต่อ Wi-Fi ตรงกับหุ่น, "sta" = ผ่านเราเตอร์
-STREAM_RESOLUTION = "720p"      # "360p" / "540p" / "720p"
+STREAM_RESOLUTION = "540p"      # 960x540 = ขนาดภาพใน GUI พอดี ส่งผ่าน Wi-Fi/ถอดรหัสเบากว่า 720p ("360p"/"540p"/"720p")
 FRAME_TIMEOUT_S = 0.5           # รอเฟรมนานสุดกี่วินาที (สั้นไว้ให้คีย์บอร์ดยังตอบสนองตอน Wi-Fi สะดุด)
 ROBOT_MODE = robot.FREE         # FREE = หมุนแค่ Gimbal ฐานล้อไม่หมุนตาม
 RECENTER_TIMEOUT_S = 3.0
@@ -59,20 +67,30 @@ FOV_Y = 54.0
 AIM_OFFSET_X_DEG = 0.0          # + = ขวา
 AIM_OFFSET_Y_DEG = 0.0          # + = บน
 
-# --- Vision ---
-COLOR_ORDER = ("red", "green", "blue", "yellow")  # ลำดับการจูนและลำดับการยิงในภารกิจ
-MIN_AREA_RATIO = 0.001          # พื้นที่คอนทัวร์ขั้นต่ำเทียบกับทั้งภาพ (0.1% ~ 920 px ที่ 720p)
-POLY_EPSILON_RATIO = 0.04       # ค่า epsilon ของ approxPolyDP เป็นสัดส่วนของเส้นรอบรูป
-MIN_VERTICES, MAX_VERTICES = 3, 6
-MIN_SOLIDITY = 0.80             # พื้นที่คอนทัวร์ / พื้นที่ Convex Hull (ต่ำ = รูปแหว่ง/ก้อนสีมั่ว)
+# --- Vision: ลอจิกจับป้ายสีจากโค้ดเพื่อน (grimball_shoot_3targets/vision.py) ---
+# กรองสี HSV -> Open/Close -> คอนทัวร์จาก mask + คอนทัวร์จากขอบภาพ (Canny)
+# -> รับเฉพาะก้อนที่ "หน้าตาเป็นป้าย": ขนาดพอดี, สัดส่วนไม่ยาวเกิน, ทึบเต็มกรอบ, ข้างในเป็นสีนั้นจริง
+COLOR_ORDER = ("red", "green", "blue", "yellow")  # ลำดับการจูนสี และลำดับยิงเริ่มต้น (เปลี่ยนได้ในหน้า READY)
+PROCESS_W = 960                 # ประมวลผลที่ความกว้างนี้ (540p = 960 พอดี ไม่ต้องย่อ) ภาพใหญ่กว่านี้จะถูกย่อก่อน
+MIN_AREA_RATIO = 0.0004         # ป้ายเล็กสุด เทียบกับพื้นที่ภาพ
+MAX_AREA_RATIO = 0.025          # ป้ายใหญ่สุด กันจับผนัง/ของใหญ่สีเดียวกัน
+MAX_SIGN_W, MAX_SIGN_H = 0.18, 0.22  # ความกว้าง/สูงสูงสุดของป้าย เทียบกับภาพ
+SIGN_ASPECT = (0.55, 2.0)       # ช่วงสัดส่วน กว้าง/สูง ของป้าย
+MIN_EXTENT = 0.65               # พื้นที่คอนทัวร์ / พื้นที่กรอบ (สี่เหลี่ยม ~1.0, สามเหลี่ยม ~0.5 -> เป้าสามเหลี่ยมใช้ 0.45)
+MIN_FILL = 0.75                 # ข้างในกรอบ (ตัดขอบออก 1/5) ต้องเป็นสีนั้นอย่างน้อยเท่านี้ (สามเหลี่ยมใช้ ~0.5)
+BORDER_PX = 3                   # ป้ายที่ชิดขอบภาพ (เห็นไม่เต็มแผ่น) ไม่นับ
+DEDUP_RATIO = 0.012             # จุดกลางห่างกันน้อยกว่านี้ (สัดส่วนภาพ) = ป้ายเดียวกัน
+MAX_CANDIDATES = 12             # เก็บป้ายต่อสีได้สูงสุดกี่อัน (เรียงจากใหญ่ไปเล็ก)
+CANNY_LOW, CANNY_HIGH = 40, 120  # ขอบภาพช่วยแยกป้ายออกจากพื้นหลังสีเดียวกัน (เช่นป้ายเหลืองบนผนังเหลือง)
 
-# ช่วง HSV เริ่มต้น: (H_min, H_max, S_min, S_max, V_min, V_max)
+# ช่วง HSV เริ่มต้น (ค่าที่จูนไว้ในโค้ดเพื่อน): (H_min, H_max, S_min, S_max, V_min, V_max)
 # ถ้า H_min > H_max แปลว่าช่วง Hue วนรอบวงล้อสี เช่นสีแดง 170..179 + 0..10
+# ใช้เมื่อยังไม่เคย calibrate หรือกดปุ่ม RESET TO DEFAULT ในหน้าจูนสี
 DEFAULT_HSV = {
     "red":    (170, 10, 120, 255, 70, 255),
-    "green":  (35, 90, 50, 255, 30, 255),
-    "blue":   (95, 130, 80, 255, 50, 255),     # สีน้ำเงินผ่านกล้องมักซีดกว่าสีอื่น จึงใช้ S_min ต่ำ
-    "yellow": (20, 35, 100, 255, 100, 255),
+    "green":  (35, 90, 70, 255, 25, 255),
+    "blue":   (90, 140, 50, 255, 20, 255),
+    "yellow": (20, 35, 153, 255, 100, 255),
 }
 
 # บังพลาสติกสีแดง/ส้มของหัว Gimbal (ด้านล่างกลางจอ) = กล่อง ±250 px สูง 180 px ที่ 720p
@@ -82,19 +100,20 @@ MIN_ZONE_PX = 10                # กรอบที่ลากเล็กก�
 # --- Tuning Phase ---
 NUDGE_DEG = 15                  # ปุ่ม i/j/k/l หมุนหัวครั้งละกี่องศา (ใช้ตอนเป้าสีนั้นอยู่นอกภาพ)
 
-# --- PID (input = องศา, output = deg/s) ---
-YAW_PID = {"kp": 2.5, "ki": 0.1, "kd": 0.05}
-PITCH_PID = {"kp": 2.5, "ki": 0.1, "kd": 0.05}
-MAX_GIMBAL_SPEED = 250.0        # deg/s
-PID_INTEGRAL_LIMIT = 50.0       # deg*s
-PID_DEADBAND_DEG = 0.3          # error เล็กกว่านี้ถือว่าตรงเป้า กันหัวสั่น
-TRACK_WHILE_TUNING = False      # False = Gimbal หยุดนิ่งระหว่างจูนสี ภาพนิ่งจูนง่ายกว่า
+# --- เล็ง: ค่าจากโค้ดเพื่อน (control.py + autoaim_config.json) input = องศา, output = deg/s ---
+# yaw = PD (kp 2.5, kd 0.05, กรอง D 0.7) ช้าสุด 25 deg/s | pitch = P (kp 2.0) ช้าสุด 10 deg/s
+# ความเร็วต่ำ = หัวไม่เลยเป้า เพราะภาพจากกล้องผ่าน Wi-Fi มาช้ากว่าความจริงเล็กน้อย
+YAW_PID = {"kp": 2.5, "ki": 0.0, "kd": 0.05, "output_limit": 25.0, "d_smoothing": 0.7}
+PITCH_PID = {"kp": 2.0, "ki": 0.0, "kd": 0.0, "output_limit": 10.0}
+PID_INTEGRAL_LIMIT = 50.0       # deg*s (ใช้เมื่อ ki > 0)
 
-# --- Auto-Fire ---
-AUTO_FIRE_ON_START = False      # เริ่มโปรแกรมในสถานะ SAFE เสมอ
-LOCK_TOLERANCE_DEG = 5.0        # error X และ Y ต้องน้อยกว่านี้
-SETTLE_TIME_S = 0.2             # และต้องค้างในระยะนานเกินนี้ถึงจะยิง
+# --- Auto-Fire (ระบบยิงเปิดเฉพาะตอนกด ENTER เริ่มภารกิจ และปิดเองเมื่อจบ/หยุด) ---
+LOCK_TOLERANCE_X_DEG = 0.25     # ค่าจากโค้ดเพื่อน: error แกน X และ Y ต้องน้อยกว่านี้
+LOCK_TOLERANCE_Y_DEG = 0.25
+MIN_LOCK_HITS = 3               # ต้องเห็นเป้าติดกันอย่างน้อยกี่เฟรมก่อนเริ่มนับเวลานิ่ง
+SETTLE_TIME_S = 0.5             # และต้องค้างในระยะนานเกินนี้ถึงจะยิง
 FIRE_COOLDOWN_S = 1.0           # เว้นระยะระหว่างนัด (ไม่ใช้ sleep จึงไม่ทำให้ภาพค้าง)
+START_KEY_GUARD_S = 1.0         # หลังเข้าหน้า READY ไม่รับปุ่มเริ่มยิงช่วงนี้ กัน ENTER ที่กดซ้ำมาจากขั้นก่อน
 
 # --- Mission: ยิงทุกเป้าทุกสี ---
 # มุม yaw ที่หยุดถ่ายภาพตอนกวาดหาเป้า (องศา, + = ขวา) กล้องกว้าง 96° จึงเห็นได้ถึง ±48° จากแต่ละมุม
@@ -111,27 +130,44 @@ SCAN_FRAMES = 6                 # จำนวนเฟรมที่เก็�
 SCAN_MIN_HITS = 3               # ต้องเห็นเป้าอย่างน้อยกี่เฟรมถึงนับเป็นเป้าจริง (กัน noise)
 POSE_MERGE_DEG = 3.0            # ในมุมกวาดเดียวกัน จุดที่ห่างกันน้อยกว่านี้ = เป้าเดียวกัน
 CROSS_POSE_MERGE_DEG = 12.0     # ข้ามมุมกวาด ค่ามุมเพี้ยนได้จากเลนส์มุมกว้าง จึงเผื่อรัศมีมากกว่า
-MATCH_RADIUS_DEG = 8.0          # ตอนเล็งละเอียด หาเป้าในรัศมีนี้รอบจุดเล็ง
+MATCH_RADIUS_DEG = 8.0          # ตอนเล็งละเอียด หาเป้าในรัศมีนี้รอบจุดเล็ง (ค่าจากโค้ดเพื่อน)
+MATCH_AREA_RATIO = (0.35, 2.8)  # ขนาดป้ายต้องใกล้กับตอนกวาดหา กันสลับไปเล็งป้ายอื่น (ค่าจากโค้ดเพื่อน)
 LOST_REPOINT_S = 1.0            # เป้าหายจากภาพนานเกินนี้ -> หันกลับไปตำแหน่งตามแผนแล้วหาใหม่
-ENGAGE_TIMEOUT_S = 6.0          # ใช้เวลากับเป้าเดียวนานเกินนี้ -> ข้ามเป้านั้น
+ENGAGE_TIMEOUT_S = 10.0         # ใช้เวลากับเป้าเดียวนานเกินนี้ -> ข้ามเป้านั้น
 SHOTS_PER_TARGET = 1
 DRY_RUN_HOLD_S = 0.5            # Auto-Fire ปิด: ค้างเล็งให้ดูกี่วินาทีก่อนไปเป้าถัดไป
 
 # --- LED ---
 TOP_LED_REFRESH_S = 3.0         # สั่งดับไฟ Top ซ้ำทุกกี่วินาที เผื่อ firmware เปิดเอง (เช่นตอนโดนยิง)
 
-# สีขาวใช้ตอน PREVIEW/MISSION: ความอิ่มสีต่ำ แสงสะท้อนจึงไม่ถูกจับเป็นเป้า
+# ไฟฐานล้อใช้สีขาว: ความอิ่มสีต่ำ แสงสะท้อนจึงไม่ถูกจับเป็นเป้า
 LED_COLORS = {"red": (255, 0, 0), "green": (0, 255, 0), "blue": (0, 0, 255), "yellow": (255, 255, 0),
               "white": (255, 255, 255)}  # RGB
 DISPLAY_COLORS = {"red": (0, 0, 255), "green": (0, 255, 0), "blue": (255, 120, 0), "yellow": (0, 255, 255)}  # BGR
 KEY_TO_COLOR = {"r": "red", "g": "green", "b": "blue", "y": "yellow"}
 NUDGE_KEYS = {"i": (NUDGE_DEG, 0), "k": (-NUDGE_DEG, 0), "j": (0, -NUDGE_DEG), "l": (0, NUDGE_DEG)}  # (pitch, yaw)
 
-MODE_PREVIEW, MODE_TRACK, MODE_MISSION = "PREVIEW", "TRACK", "MISSION"
+COLOR_SHORT = {"red": "RED", "green": "GRN", "blue": "BLU", "yellow": "YEL"}
+
+# --- GUI หน้าต่างเดียว ---
+WINDOW_NAME = "RoboMaster Auto-Aim"
+VIEW_W, VIEW_H = 960, 540       # ภาพกล้องในหน้าต่าง (ย่อจาก 720p)
+PANEL_W = 320                   # แผงปุ่มด้านขวา
+STRIP_H = 180                   # แถบล่าง: slider จูนสี / คำแนะนำ / ผลภารกิจ
+CANVAS_W, CANVAS_H = VIEW_W + PANEL_W, VIEW_H + STRIP_H  # 1280 x 720
+UI_BG = (30, 30, 30)            # สีทั้งหมดเป็น BGR
+UI_PANEL = (45, 45, 45)
+UI_BTN = (85, 85, 85)
+UI_TEXT = (235, 235, 235)
+UI_DIM = (150, 150, 150)
+UI_GREEN = (60, 140, 60)
+UI_OK = (120, 220, 120)
+UI_RED = (40, 40, 200)
+UI_BLUE = (150, 100, 40)
+UI_ORANGE = (0, 130, 230)
+SCREEN_SETUP, SCREEN_TUNE, SCREEN_READY, SCREEN_MISSION = "SETUP", "TUNE", "READY", "MISSION"
 
 CONFIG_PATH = Path(__file__).resolve().with_name("autoaim_config.json")
-MAIN_WINDOW = "RoboMaster Auto-Aim"
-SETUP_WINDOW = "SETUP - Blind Zones"
 FONT = cv2.FONT_HERSHEY_SIMPLEX
 
 
@@ -179,11 +215,13 @@ def default_color_ranges() -> Dict[str, HSVRange]:
     return {name: HSVRange(*values) for name, values in DEFAULT_HSV.items()}
 
 
-def load_config(path: Path) -> Tuple[Dict[str, HSVRange], List[Zone]]:
-    """ โหลดค่า HSV + พื้นที่ตาบอดที่ผู้ใช้วาดไว้ ถ้าไม่มีไฟล์หรือไฟล์เสียจะใช้ค่าเริ่มต้น """
+def load_config(path: Path) -> Tuple[Dict[str, HSVRange], List[Zone], List[str], bool]:
+    """ โหลดค่าที่ calibrate ไว้: HSV, พื้นที่ตาบอด และลำดับยิงล่าสุด
+    ค่าสุดท้าย (found) เป็น False ถ้าไม่มีไฟล์หรือไฟล์เสีย = ต้อง calibrate ใหม่
+    """
     ranges = default_color_ranges()
     if not path.exists():
-        return ranges, []
+        return ranges, [], list(COLOR_ORDER), False
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         for name, values in data.get("hsv", {}).items():
@@ -194,17 +232,20 @@ def load_config(path: Path) -> Tuple[Dict[str, HSVRange], List[Zone]]:
             x1, y1, x2, y2 = (float(v) for v in zone)
             if 0.0 <= x1 < x2 <= 1.0 and 0.0 <= y1 < y2 <= 1.0:
                 zones.append((x1, y1, x2, y2))
+        order = [c for c in data.get("fire_order", COLOR_ORDER) if c in ranges]
+        order = list(dict.fromkeys(order))  # ตัดสีซ้ำ คงลำดับเดิม
     except (OSError, ValueError, KeyError, TypeError) as e:
         print(f"[CONFIG] ⚠️ อ่าน {path.name} ไม่ได้ ({e}) ใช้ค่าเริ่มต้นแทน")
-        return default_color_ranges(), []
+        return default_color_ranges(), [], list(COLOR_ORDER), False
     print(f"[CONFIG] โหลดค่า HSV และพื้นที่ตาบอด {len(zones)} กรอบ จาก {path.name}")
-    return ranges, zones
+    return ranges, zones, order, True
 
 
-def save_config(path: Path, ranges: Dict[str, HSVRange], zones: List[Zone]):
+def save_config(path: Path, ranges: Dict[str, HSVRange], zones: List[Zone], order: List[str]):
     data = {
         "hsv": {name: asdict(rng) for name, rng in ranges.items()},
         "user_blind_zones": [[round(v, 4) for v in zone] for zone in zones],
+        "fire_order": list(order),
     }
     try:
         path.write_text(json.dumps(data, indent=2), encoding="utf-8")
@@ -329,125 +370,122 @@ class ZoneDrawer:
                 print(f">> เพิ่มพื้นที่ตาบอด #{len(self.blind_zones.user_zones)}")
 
 
-def run_setup_phase(ep_camera, blind_zones: BlindZones) -> bool:
-    """ ให้ผู้ใช้วาดพื้นที่ตาบอดเพิ่ม คืนค่า False ถ้าผู้ใช้กดออกจากโปรแกรม """
-    drawer = ZoneDrawer(blind_zones)
-    cv2.namedWindow(SETUP_WINDOW)
-    cv2.setMouseCallback(SETUP_WINDOW, drawer.on_mouse)
-
-    print("\n" + "=" * 60)
-    print(" 🛠️ SETUP: พื้นที่ตาบอด (Blind Zone)")
-    print(" - กล่องสีส้มคือ AUTO BLIND ZONE บังหัว Gimbal ให้อัตโนมัติ")
-    print(" - กดเมาส์ค้างแล้วลาก เพื่อวาดกรอบบังเพิ่ม (วาดได้หลายกรอบ)")
-    print(" - [u] ลบกรอบล่าสุด  [x] ลบกรอบที่วาดทั้งหมด")
-    print(" - [ENTER/SPACE] ไปขั้นจูนสี  [q/ESC] ออก")
-    print("=" * 60 + "\n")
-
-    while True:
-        frame = read_frame(ep_camera)
-        if frame is None:
-            continue
-        h, w = frame.shape[:2]
-        drawer.frame_size = (w, h)
-
-        view = frame.copy()
-        blind_zones.draw(view, fill_alpha=0.6)
-        if drawer.drag_start is not None and drawer.drag_end is not None:
-            cv2.rectangle(view, drawer.drag_start, drawer.drag_end, (0, 255, 255), 2)
-        put_text(view, "SETUP: drag mouse to add blind zones", (15, 30), (0, 255, 0), 0.7)
-        put_text(view, "[u] undo  [x] clear  [ENTER/SPACE] next  [q] quit", (15, 60), (255, 255, 255), 0.6)
-        put_text(view, f"User zones: {len(blind_zones.user_zones)}", (15, 90), (255, 255, 255), 0.6)
-        cv2.imshow(SETUP_WINDOW, view)
-
-        key = cv2.waitKey(1) & 0xFF
-        if key in (13, 10, 32):
-            break
-        if key in (ord("q"), 27):
-            cv2.destroyWindow(SETUP_WINDOW)
-            return False
-        if key == ord("u") and blind_zones.user_zones:
-            blind_zones.user_zones.pop()
-        elif key == ord("x"):
-            blind_zones.user_zones.clear()
-
-    cv2.destroyWindow(SETUP_WINDOW)
-    print(f">> ✅ ใช้พื้นที่ตาบอด 1 (อัตโนมัติ) + {len(blind_zones.user_zones)} (ผู้ใช้วาด)")
-    return True
-
-
 # ==========================================
-# 5. Vision: Mask สี + ตรวจรูปทรงเรขาคณิต
+# 5. Vision: จับป้ายสี (ลอจิกจากโค้ดเพื่อน grimball_shoot_3targets/vision.py)
 # ==========================================
 @dataclass
 class Target:
     color: str
-    cx: int
-    cy: int
+    cx: float                         # จุดกลางกรอบป้าย (พิกเซลของภาพที่ประมวลผล)
+    cy: float
     area: float
-    vertices: int
-    approx: np.ndarray
+    bbox: Tuple[int, int, int, int]   # x, y, w, h
 
 
-_MORPH_KERNEL = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+@dataclass
+class FrameData:
+    """ ข้อมูลที่คำนวณครั้งเดียวต่อเฟรม แล้วใช้ร่วมกันทุกสี """
+    bgr: np.ndarray                   # ภาพขนาดที่ประมวลผล (พิกัดเป้าทั้งหมดอ้างอิงภาพนี้)
+    hsv: np.ndarray
+    edge_boxes: List[Tuple[float, Tuple[int, int, int, int]]]  # (พื้นที่, กรอบ) จากขอบภาพที่รูปร่างเป็นป้าย
+
+    @property
+    def size(self) -> Tuple[int, int]:
+        h, w = self.hsv.shape[:2]
+        return w, h
 
 
-def prepare_hsv(frame_bgr: np.ndarray) -> np.ndarray:
-    """ ทำครั้งเดียวต่อเฟรม แล้วใช้ร่วมกันทุกสี """
-    blurred = cv2.GaussianBlur(frame_bgr, (5, 5), 0)  # ลด noise ของ sensor ก่อนกรองสี
-    return cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
+_MORPH_KERNEL = np.ones((3, 3), np.uint8)
+
+
+def _sign_box(contour, w: int, h: int) -> Optional[Tuple[float, Tuple[int, int, int, int]]]:
+    """ เกณฑ์รูปร่างป้าย (ไม่ขึ้นกับสี) คืน (พื้นที่, กรอบ) หรือ None ถ้าไม่เหมือนป้าย """
+    x, y, bw, bh = cv2.boundingRect(contour)
+    frame_area = w * h
+    if bw * bh < MIN_AREA_RATIO * frame_area:
+        return None  # เศษเล็กๆ ตัดทิ้งก่อนคำนวณอย่างอื่น (ภาพที่มีลายเยอะมีคอนทัวร์จากขอบเป็นพันเส้น)
+    if bw > w * MAX_SIGN_W or bh > h * MAX_SIGN_H or not SIGN_ASPECT[0] <= bw / bh <= SIGN_ASPECT[1]:
+        return None
+    if x < BORDER_PX or y < BORDER_PX or x + bw >= w - BORDER_PX or y + bh >= h - BORDER_PX:
+        return None  # ชิดขอบภาพ = เห็นป้ายไม่เต็มแผ่น
+    area = cv2.contourArea(contour)
+    if not MIN_AREA_RATIO * frame_area <= area <= MAX_AREA_RATIO * frame_area:
+        return None
+    if area / (bw * bh) < MIN_EXTENT:
+        return None  # ไม่ทึบเต็มกรอบ = ก้อนสีรูปร่างมั่ว
+    return area, (x, y, bw, bh)
+
+
+def prepare_frame(frame_bgr: np.ndarray) -> FrameData:
+    """ ย่อภาพ (ถ้าใหญ่กว่า PROCESS_W) -> HSV และขอบภาพ ทำครั้งเดียวต่อเฟรม
+    โค้ดเพื่อนคำนวณขอบภาพซ้ำทุกสี ที่นี่คำนวณครั้งเดียวและคัดรูปร่างป้ายไว้ก่อน จึงเร็วกว่ามาก
+    """
+    h, w = frame_bgr.shape[:2]
+    small = frame_bgr
+    if w > PROCESS_W:
+        small = cv2.resize(frame_bgr, (PROCESS_W, int(round(h * PROCESS_W / w))), interpolation=cv2.INTER_AREA)
+    sh, sw = small.shape[:2]
+    hsv = cv2.cvtColor(cv2.GaussianBlur(small, (5, 5), 0), cv2.COLOR_BGR2HSV)
+    edges = cv2.Canny(cv2.cvtColor(small, cv2.COLOR_BGR2GRAY), CANNY_LOW, CANNY_HIGH)
+    edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, _MORPH_KERNEL)
+    edge_boxes = []
+    for contour in cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)[-2]:
+        box = _sign_box(contour, sw, sh)
+        if box is not None:
+            edge_boxes.append(box)
+    return FrameData(small, hsv, edge_boxes)
 
 
 def build_mask(hsv: np.ndarray, hsv_range: HSVRange, blind_zones: BlindZones) -> np.ndarray:
     mask = hsv_range.mask(hsv)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, _MORPH_KERNEL)   # ลบจุดสีเล็กๆ
-    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, _MORPH_KERNEL)  # อุดรูในเป้า ขอบเรียบขึ้น
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, _MORPH_KERNEL)  # อุดรูในป้าย
     blind_zones.apply(mask)  # ทำเป็นขั้นสุดท้าย พื้นที่ตาบอดจึงดำสนิทแน่นอน
     return mask
 
 
-def find_geometric_targets(mask: np.ndarray, color: str) -> List[Target]:
-    """ หาทุกเป้าที่เป็นรูปทรง 3-6 มุมและทึบพอ เรียงจากใหญ่ไปเล็ก
-    ไม่มี fallback ไปเลือกก้อนสีใหญ่สุด เพราะจะทำให้ตัวกรองรูปทรงไม่มีความหมาย
+def find_targets(fd: FrameData, mask: np.ndarray, color: str) -> List[Target]:
+    """ ป้ายสี color ทั้งหมดในภาพ เรียงจากใหญ่ไปเล็ก (สูงสุด MAX_CANDIDATES)
+    ผู้สมัคร = คอนทัวร์จาก mask สีนั้น + คอนทัวร์จากขอบภาพ ที่รูปร่างเป็นป้าย
+    แล้วข้างในกรอบ (ตัดขอบออก 1/5) ต้องเป็นสีนั้นอย่างน้อย MIN_FILL
     """
-    h, w = mask.shape[:2]
-    min_area = MIN_AREA_RATIO * w * h
-    contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]  # รองรับ OpenCV 3 และ 4
+    w, h = fd.size
+    boxes = []
+    for contour in cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]:
+        box = _sign_box(contour, w, h)
+        if box is not None:
+            boxes.append(box)
+    boxes += fd.edge_boxes
 
     found: List[Target] = []
-    for cnt in contours:
-        area = cv2.contourArea(cnt)
-        if area < min_area:
+    for area, (x, y, bw, bh) in boxes:
+        inset = max(2, min(bw, bh) // 5)
+        interior = mask[y + inset:y + bh - inset, x + inset:x + bw - inset]
+        if interior.size == 0 or cv2.countNonZero(interior) / interior.size < MIN_FILL:
             continue
-
-        approx = cv2.approxPolyDP(cnt, POLY_EPSILON_RATIO * cv2.arcLength(cnt, True), True)
-        if not MIN_VERTICES <= len(approx) <= MAX_VERTICES:
-            continue
-
-        hull_area = cv2.contourArea(cv2.convexHull(cnt))
-        if hull_area <= 0 or area / hull_area < MIN_SOLIDITY:
-            continue
-
-        m = cv2.moments(cnt)
-        if m["m00"] == 0:
-            continue
-        # ใช้จุดศูนย์กลางมวล (centroid) นิ่งกว่ากึ่งกลาง bounding box
-        found.append(Target(color, int(m["m10"] / m["m00"]), int(m["m01"] / m["m00"]), area, len(approx), approx))
-    return sorted(found, key=lambda t: t.area, reverse=True)
+        cx, cy = x + bw / 2.0, y + bh / 2.0
+        if any(abs(cx - t.cx) < DEDUP_RATIO * w and abs(cy - t.cy) < DEDUP_RATIO * h for t in found):
+            continue  # ป้ายเดียวกันที่เจอทั้งจาก mask และจากขอบภาพ
+        found.append(Target(color, cx, cy, area, (x, y, bw, bh)))
+    found.sort(key=lambda t: t.area, reverse=True)
+    return found[:MAX_CANDIDATES]
 
 
-def detect_all_colors(hsv: np.ndarray, ranges: Dict[str, HSVRange], blind_zones: BlindZones) -> List[Target]:
+def detect_all_colors(fd: FrameData, ranges: Dict[str, HSVRange], blind_zones: BlindZones) -> List[Target]:
     found: List[Target] = []
     for color in COLOR_ORDER:
-        found.extend(find_geometric_targets(build_mask(hsv, ranges[color], blind_zones), color))
+        found.extend(find_targets(fd, build_mask(fd.hsv, ranges[color], blind_zones), color))
     return found
 
 
-def draw_targets(frame: np.ndarray, targets: List[Target]):
+def draw_targets(frame: np.ndarray, targets: List[Target], scale: float = 1.0):
+    """ scale = ขนาดภาพที่วาด / ขนาดภาพที่ประมวลผล """
     for t in targets:
         bgr = DISPLAY_COLORS[t.color]
-        cv2.drawContours(frame, [t.approx], -1, bgr, 3)
-        cv2.circle(frame, (t.cx, t.cy), 5, (0, 0, 255), -1)
-        put_text(frame, f"{t.color.upper()} {t.vertices}c", (t.cx + 10, t.cy - 10), bgr, 0.5, 1)
+        x, y, bw, bh = (int(round(v * scale)) for v in t.bbox)
+        cv2.rectangle(frame, (x, y), (x + bw, y + bh), bgr, 2)
+        cv2.circle(frame, (int(t.cx * scale), int(t.cy * scale)), 3, (255, 255, 255), -1)
+        put_text(frame, t.color.upper(), (x, max(14, y - 6)), bgr, 0.5, 1)
 
 
 # ==========================================
@@ -460,8 +498,8 @@ class PIDController:
     """
     STALE_DT_S = 0.5  # ห่างจากรอบก่อนนานเกินนี้ (เช่นหลัง recenter) ถือว่าเริ่มใหม่
 
-    def __init__(self, kp, ki, kd, output_limit=MAX_GIMBAL_SPEED, integral_limit=PID_INTEGRAL_LIMIT,
-                 deadband=PID_DEADBAND_DEG, d_smoothing=0.5):
+    def __init__(self, kp, ki, kd, output_limit=25.0, integral_limit=PID_INTEGRAL_LIMIT,
+                 deadband=0.0, d_smoothing=0.5):
         self.kp, self.ki, self.kd = kp, ki, kd
         self.output_limit = output_limit
         self.integral_limit = integral_limit
@@ -511,26 +549,31 @@ class PIDController:
 # 7. ลอจิกการยิง (Settling Time + Safety)
 # ==========================================
 class FireController:
-    """ ตัดสินว่ายิงได้หรือยัง
-    ยิงเมื่อ |err_x| และ |err_y| < LOCK_TOLERANCE_DEG ต่อเนื่องนานเกิน SETTLE_TIME_S
+    """ ตัดสินว่ายิงได้หรือยัง (เกณฑ์ล็อกจากโค้ดเพื่อน)
+    ยิงเมื่อเห็นเป้าติดกันอย่างน้อย MIN_LOCK_HITS เฟรม และ |err_x| <= LOCK_TOLERANCE_X_DEG,
+    |err_y| <= LOCK_TOLERANCE_Y_DEG ต่อเนื่องนานเกิน SETTLE_TIME_S
     และ Auto-Fire เปิด และไม่อยู่ในโหมดจูน และพ้น cooldown
     """
 
     def __init__(self):
-        self.armed = AUTO_FIRE_ON_START
+        self.armed = False    # เปิดเฉพาะตอนสั่งเริ่มยิง
         self.settled = False  # เล็งนิ่งครบเวลาแล้วหรือยัง (ใช้ตอนซ้อมเล็งในภารกิจ)
         self._lock_start: Optional[float] = None
+        self._hits = 0
         self._last_fire = float("-inf")
 
     def reset_lock(self):
         self._lock_start = None
+        self._hits = 0
         self.settled = False
 
     def evaluate(self, err_x: float, err_y: float, tuning: bool) -> Tuple[str, bool]:
-        """ คืนค่า (ข้อความสถานะสำหรับ HUD, ควรยิงหรือไม่) """
+        """ คืนค่า (ข้อความสถานะสำหรับ HUD, ควรยิงหรือไม่) เรียกเฉพาะเฟรมที่เห็นเป้า """
         now = time.monotonic()
         self.settled = False
-        if abs(err_x) >= LOCK_TOLERANCE_DEG or abs(err_y) >= LOCK_TOLERANCE_DEG:
+        self._hits += 1
+        aligned = abs(err_x) <= LOCK_TOLERANCE_X_DEG and abs(err_y) <= LOCK_TOLERANCE_Y_DEG
+        if not aligned or self._hits < MIN_LOCK_HITS:
             self._lock_start = None
             return "TRACKING", False
 
@@ -559,28 +602,45 @@ class FireController:
 class LedManager:
     """ คุมไฟทั้งหมดของหุ่น
     - ไฟ Top (บน Gimbal) และไฟ Blaster: ดับตลอด กันแสงสะท้อนเข้ากล้อง
-    - ไฟ Bottom (ฐานล้อ): แสดงสถานะ
-        สี  : TRACK = สีเป้าหมาย, PREVIEW/MISSION = ขาว
-        แบบ : ติดค้าง = SAFE, กระพริบ = Auto-Fire พร้อมยิง, หายใจ = โหมดจูน
+    - ไฟ Bottom (ฐานล้อ): แสดงสถานะด้วยสีขาว
+        ติดค้าง = SAFE, กระพริบ = Auto-Fire พร้อมยิง, หายใจ = โหมดจูน
+
+    คำสั่งไฟทุกคำสั่งส่งจาก thread แยก เพราะ set_led ต้องรอหุ่นตอบกลับ (Wi-Fi สะดุดรอได้ถึง 3 วินาที)
+    ถ้าส่งจาก Loop หลัก ภาพและปุ่มจะค้างทุกครั้งที่ส่ง
     """
+    _STOP = object()
 
     def __init__(self, ep_led, ep_blaster):
         self._led = ep_led
         self._blaster = ep_blaster
-        self._last_top_off = float("-inf")
         self._bottom_state = None
+        self._jobs: "queue.Queue" = queue.Queue()
+        self._thread = threading.Thread(target=self._worker, name="led-worker", daemon=True)
+        self._thread.start()
+
+    def _worker(self):
+        next_top_off = 0.0
+        while True:
+            try:
+                job = self._jobs.get(timeout=0.2)
+            except queue.Empty:
+                job = None
+            if job is self._STOP:
+                return
+            if job is not None:
+                job()
+            if time.monotonic() >= next_top_off:  # ดับไฟ Top ซ้ำเป็นระยะ เผื่อ firmware เปิดเอง (เช่นตอนโดนยิง)
+                self._top_off()
+                next_top_off = time.monotonic() + TOP_LED_REFRESH_S
 
     def _top_off(self):
         safe_call("top LED off", self._led.set_led, comp=led.COMP_TOP_ALL, r=0, g=0, b=0, effect=led.EFFECT_OFF)
-        self._last_top_off = time.monotonic()
 
     def silence_gimbal_lights(self):
-        self._top_off()
-        safe_call("blaster LED off", self._blaster.set_led, brightness=0, effect=blaster.LED_OFF)
-
-    def keep_top_off(self):
-        if time.monotonic() - self._last_top_off >= TOP_LED_REFRESH_S:
+        def job():
             self._top_off()
+            safe_call("blaster LED off", self._blaster.set_led, brightness=0, effect=blaster.LED_OFF)
+        self._jobs.put(job)
 
     def show_status(self, color: str, armed: bool, tuning: bool):
         if tuning:
@@ -591,64 +651,169 @@ class LedManager:
             effect = led.EFFECT_ON
         state = (color, effect)
         if state == self._bottom_state:
-            return  # ส่งคำสั่งเฉพาะตอนสถานะเปลี่ยน ไม่ถ่วง loop
-        r, g, b = LED_COLORS[color]
-        safe_call("bottom LED", self._led.set_led, comp=led.COMP_BOTTOM_ALL, r=r, g=g, b=b, effect=effect, freq=2)
+            return  # ส่งคำสั่งเฉพาะตอนสถานะเปลี่ยน
         self._bottom_state = state
+        r, g, b = LED_COLORS[color]
+        self._jobs.put(lambda: safe_call("bottom LED", self._led.set_led, comp=led.COMP_BOTTOM_ALL,
+                                         r=r, g=g, b=b, effect=effect, freq=2))
 
-    def all_off(self):
+    def close(self):
+        """ หยุด thread แล้วดับไฟทั้งหมด (ตอนปิดโปรแกรม) """
+        self._jobs.put(self._STOP)
+        self._thread.join(timeout=5)
         safe_call("all LED off", self._led.set_led, comp=led.COMP_ALL, r=0, g=0, b=0, effect=led.EFFECT_OFF)
         self._bottom_state = None
 
 
 # ==========================================
-# 9. Live HSV Tuning
+# 9. GUI หน้าต่างเดียว (ปุ่ม/slider วาดเองด้วย OpenCV คลิกเมาส์ได้ และมีปุ่มลัดคีย์บอร์ด)
 # ==========================================
-class TuningPanel:
-    """ หน้าต่าง Trackbar ปรับค่า HSV แบบ Real-time โดย Loop หลักยังทำงานต่อ """
-    WINDOW = "Live HSV Tuning"
-    PREVIEW_WINDOW = "Tuning Preview (masked)"
-    TRACKBARS = (("H Min", "h_min", 179), ("H Max", "h_max", 179),
-                 ("S Min", "s_min", 255), ("S Max", "s_max", 255),
-                 ("V Min", "v_min", 255), ("V Max", "v_max", 255))
+def text_color_for(bg: Tuple[int, int, int]) -> Tuple[int, int, int]:
+    """ ตัวหนังสือดำบนพื้นสว่าง (เช่นปุ่มสีเหลือง) และขาวบนพื้นเข้ม """
+    b, g, r = bg
+    return (20, 20, 20) if 0.114 * b + 0.587 * g + 0.299 * r > 150 else UI_TEXT
+
+
+def label(canvas, text, x, y, color=UI_TEXT, scale=0.5, thickness=1, max_w: Optional[int] = None):
+    """ เขียนข้อความบนแผง GUI ถ้ากำหนด max_w จะย่อตัวอักษรจนพอดีความกว้าง """
+    if max_w is not None:
+        while scale > 0.35 and cv2.getTextSize(text, FONT, scale, thickness)[0][0] > max_w:
+            scale -= 0.03
+    cv2.putText(canvas, text, (x, y), FONT, scale, color, thickness, cv2.LINE_AA)
+
+
+def dim(color: Tuple[int, int, int], factor: float = 0.35) -> Tuple[int, int, int]:
+    return tuple(int(c * factor) for c in color)
+
+
+@lru_cache(maxsize=4)
+def hue_bar(w: int, h: int) -> np.ndarray:
+    """ แถบสีรุ้งใต้ slider ของ H ให้เห็นว่าค่า Hue แต่ละช่วงคือสีอะไร """
+    hues = np.tile(np.linspace(0, 179, w).astype(np.uint8), (h, 1))
+    full = np.full((h, w), 255, np.uint8)
+    return cv2.cvtColor(np.dstack([hues, full, full]), cv2.COLOR_HSV2BGR)
+
+
+@dataclass
+class Button:
+    x: int
+    y: int
+    w: int
+    h: int
+    text: str
+    action: str
+    color: Tuple[int, int, int] = UI_BTN
+    enabled: bool = True
+    selected: bool = False
+
+    def contains(self, px: int, py: int) -> bool:
+        return self.x <= px < self.x + self.w and self.y <= py < self.y + self.h
+
+    def draw(self, canvas: np.ndarray, hover: bool):
+        color = self.color if self.enabled else (55, 55, 55)
+        if hover and self.enabled:
+            color = tuple(min(255, c + 35) for c in color)
+        cv2.rectangle(canvas, (self.x, self.y), (self.x + self.w, self.y + self.h), color, -1)
+        if self.selected:
+            cv2.rectangle(canvas, (self.x, self.y), (self.x + self.w, self.y + self.h), (255, 255, 255), 2)
+        big = self.h >= 50
+        scale, thickness = (0.62, 2) if big else (0.5, 1)
+        while scale > 0.35 and cv2.getTextSize(self.text, FONT, scale, thickness)[0][0] > self.w - 10:
+            scale -= 0.03
+        (tw, th), _ = cv2.getTextSize(self.text, FONT, scale, thickness)
+        fg = text_color_for(color) if self.enabled else (110, 110, 110)
+        cv2.putText(canvas, self.text, (self.x + (self.w - tw) // 2, self.y + (self.h + th) // 2),
+                    FONT, scale, fg, thickness, cv2.LINE_AA)
+
+
+@dataclass
+class Slider:
+    x: int
+    y: int
+    w: int
+    text: str
+    value: int
+    max_value: int
+    on_change: Callable[[int], None]
+    hue: bool = False
+    TRACK_DY = 20   # ระยะจากบรรทัดชื่อลงมาถึงราง slider
+    TRACK_H = 14
+
+    def contains(self, px: int, py: int) -> bool:
+        ty = self.y + self.TRACK_DY
+        return self.x - 8 <= px <= self.x + self.w + 8 and ty - 10 <= py <= ty + self.TRACK_H + 10
+
+    def set_from_x(self, px: int):
+        value = int(round((px - self.x) / self.w * self.max_value))
+        value = min(max(value, 0), self.max_value)
+        if value != self.value:
+            self.value = value
+            self.on_change(value)
+
+    def draw(self, canvas: np.ndarray):
+        ty = self.y + self.TRACK_DY
+        label(canvas, f"{self.text}: {self.value}", self.x, self.y + 12, UI_TEXT, 0.5)
+        if self.hue:
+            canvas[ty:ty + self.TRACK_H, self.x:self.x + self.w] = hue_bar(self.w, self.TRACK_H)
+        else:
+            cv2.rectangle(canvas, (self.x, ty), (self.x + self.w, ty + self.TRACK_H), (85, 85, 85), -1)
+            fill = self.x + int(self.value / self.max_value * self.w)
+            cv2.rectangle(canvas, (self.x, ty), (fill, ty + self.TRACK_H), (160, 160, 160), -1)
+        kx = self.x + int(self.value / self.max_value * self.w)
+        cv2.rectangle(canvas, (kx - 4, ty - 4), (kx + 4, ty + self.TRACK_H + 4), (255, 255, 255), -1)
+        cv2.rectangle(canvas, (kx - 4, ty - 4), (kx + 4, ty + self.TRACK_H + 4), (0, 0, 0), 1)
+
+
+class Ui:
+    """ เก็บปุ่ม/slider ของเฟรมล่าสุด (วาดใหม่ทุกเฟรม) และแปลงการคลิกเมาส์เป็น action
+    action ถูกเก็บเข้าคิว แล้วให้ Loop หลักเป็นคนทำ (ไม่สั่งหุ่นจากใน mouse callback)
+    """
 
     def __init__(self):
-        self.is_open = False
+        self.buttons: List[Button] = []
+        self.sliders: List[Slider] = []
+        self.actions = deque()
+        self.mouse = (-1, -1)
+        self.zone_drawer: Optional[ZoneDrawer] = None  # เปิดใช้เฉพาะหน้า SETUP
+        self._dragging: Optional[Slider] = None
 
-    def open(self, rng: HSVRange):
-        cv2.namedWindow(self.WINDOW)
-        cv2.resizeWindow(self.WINDOW, 400, 300)
-        for label, field_name, max_val in self.TRACKBARS:
-            cv2.createTrackbar(label, self.WINDOW, getattr(rng, field_name), max_val, lambda _: None)
-        self.is_open = True
+    def begin(self):
+        self.buttons, self.sliders = [], []
 
-    def load(self, rng: HSVRange):
-        """ เปลี่ยนสีที่จูน: ย้ายค่าของสีใหม่ขึ้น Trackbar """
-        for label, field_name, _ in self.TRACKBARS:
-            cv2.setTrackbarPos(label, self.WINDOW, getattr(rng, field_name))
+    def button(self, canvas, x, y, w, h, text, action, color=UI_BTN, enabled=True, selected=False):
+        b = Button(x, y, w, h, text, action, color, enabled, selected)
+        b.draw(canvas, b.contains(*self.mouse))
+        self.buttons.append(b)
 
-    def read(self) -> Optional[HSVRange]:
-        """ คืน None ถ้าหน้าต่างถูกปิด (เช่นกดปุ่ม X) """
-        try:
-            values = {name: cv2.getTrackbarPos(label, self.WINDOW) for label, name, _ in self.TRACKBARS}
-        except cv2.error:
-            return None
-        if any(v < 0 for v in values.values()):
-            return None
-        return HSVRange(**values)
+    def slider(self, canvas, x, y, w, text, value, max_value, on_change, hue=False):
+        s = Slider(x, y, w, text, value, max_value, on_change, hue)
+        s.draw(canvas)
+        self.sliders.append(s)
 
-    def show_preview(self, frame: np.ndarray, mask: np.ndarray):
-        # แสดงเฉพาะพิกเซลที่ผ่าน Mask ในสีจริง ย่อครึ่งหนึ่งไม่ให้เต็มจอ
-        preview = cv2.bitwise_and(frame, frame, mask=mask)
-        cv2.imshow(self.PREVIEW_WINDOW, cv2.resize(preview, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA))
-
-    def close(self):
-        for name in (self.WINDOW, self.PREVIEW_WINDOW):
-            try:
-                cv2.destroyWindow(name)
-            except cv2.error:
-                pass
-        self.is_open = False
+    def on_mouse(self, event, x, y, flags, param):
+        self.mouse = (x, y)
+        if event == cv2.EVENT_LBUTTONDOWN:
+            for b in self.buttons:
+                if b.enabled and b.contains(x, y):
+                    self.actions.append(b.action)
+                    return
+            for s in self.sliders:
+                if s.contains(x, y):
+                    self._dragging = s
+                    s.set_from_x(x)
+                    return
+            if self.zone_drawer is not None and x < VIEW_W and y < VIEW_H:
+                self.zone_drawer.on_mouse(event, x, y, flags, param)
+        elif event == cv2.EVENT_MOUSEMOVE:
+            if self._dragging is not None:
+                self._dragging.set_from_x(x)
+            elif self.zone_drawer is not None:
+                self.zone_drawer.on_mouse(event, x, y, flags, param)
+        elif event == cv2.EVENT_LBUTTONUP:
+            if self._dragging is not None:
+                self._dragging = None
+            elif self.zone_drawer is not None:
+                self.zone_drawer.on_mouse(event, x, y, flags, param)
 
 
 # ==========================================
@@ -703,7 +868,8 @@ class TargetMap:
         self._current = []
         return len(kept)
 
-    def build_plan(self) -> List[PlannedTarget]:
+    def build_plan(self, order: List[str]) -> List[PlannedTarget]:
+        """ order = สีที่จะยิงเรียงตามลำดับ สีที่ไม่อยู่ใน order จะไม่ถูกยิง """
         observations = sorted(((i, obs) for i, objs in enumerate(self._by_pose) for obs in objs),
                               key=lambda item: item[1].offset)  # ค่าที่วัดใกล้กลางภาพที่สุดเป็นตัวแทน
         clusters: List[PlannedTarget] = []
@@ -717,15 +883,17 @@ class TargetMap:
             else:
                 obs.poses = {pose_idx}
                 clusters.append(obs)
-        # ลำดับยิง: ตามลำดับสี แล้วซ้ายไปขวา (บนลงล่างถ้า yaw เท่ากัน)
-        return sorted(clusters, key=lambda c: (COLOR_ORDER.index(c.color), c.yaw, -c.pitch))
+        # กวาดหาทุกสีแล้วค่อยกรอง: วัตถุที่ผ่าน 2 ช่วงสีถูกตัดสินเป็นสีที่เห็นบ่อยกว่าไปแล้วใน end_pose()
+        # ลำดับยิง: ตามลำดับสีที่เลือก แล้วซ้ายไปขวา (บนลงล่างถ้า yaw เท่ากัน)
+        chosen = [c for c in clusters if c.color in order]
+        return sorted(chosen, key=lambda c: (order.index(c.color), c.yaw, -c.pitch))
 
 
 class Mission:
-    """ ภารกิจยิงทุกเป้าทุกสี แบบ non-blocking (เรียก step() ทุกเฟรม ภาพและปุ่มจึงไม่ค้าง)
+    """ ภารกิจยิงทุกเป้าตามลำดับสี แบบ non-blocking (เรียก step() ทุกเฟรม ภาพและปุ่มจึงไม่ค้าง)
 
     SCAN   : หมุนไปทีละมุมใน SCAN_PITCH_ANGLES x SCAN_YAW_ANGLES เก็บตำแหน่งเป้าทุกสี
-    ENGAGE : หมุนไปยังเป้าตามแผน (moveto) -> เล็งละเอียดด้วยภาพ + PID -> ยิง -> เป้าถัดไป
+    ENGAGE : ยิงตามลำดับสีใน order: หมุนไปยังเป้า (moveto) -> เล็งละเอียดด้วยภาพ + PID -> ยิง -> เป้าถัดไป
     DONE   : จบภารกิจ
 
     ใช้ gimbal.moveto ซึ่งอ้างอิง yaw กับฐานล้อ และ pitch กับแนวระนาบ จึงเป็นพิกัดเดียวกับ recenter
@@ -733,8 +901,9 @@ class Mission:
     STATUS_SHORT = {"PENDING": "..", "ENGAGING": ">>", "FIRED": "SHOT", "AIMED-SAFE": "AIM", "SKIPPED": "SKIP"}
     MOVE_RETRY_S = 0.5
 
-    def __init__(self, app: "AutoAimApp"):
+    def __init__(self, app: "AutoAimApp", order: List[str]):
         self.app = app
+        self.order = list(order)
         self.poses = [(float(p), float(y)) for p in SCAN_PITCH_ANGLES for y in SCAN_YAW_ANGLES]
         self.target_map = TargetMap()
         self.plan: List[PlannedTarget] = []
@@ -796,22 +965,22 @@ class Mission:
         return True
 
     # ---------- วนทุกเฟรม ----------
-    def step(self, frame: np.ndarray, hsv: np.ndarray):
+    def step(self, fd: FrameData):
         self.visible, self.match, self.error = [], None, None
         if self.phase == "SCAN":
-            self._step_scan(frame, hsv)
+            self._step_scan(fd)
         elif self.phase == "ENGAGE":
-            self._step_engage(frame, hsv)
+            self._step_engage(fd)
 
-    def _step_scan(self, frame: np.ndarray, hsv: np.ndarray):
+    def _step_scan(self, fd: FrameData):
         pitch, yaw = self.pose
         ready = self._ready()
         self.state = f"SCAN {self.index + 1}/{len(self.poses)} (pitch {pitch:+.0f}, yaw {yaw:+.0f}) {self.sub}"
         if not ready:
             return
 
-        h, w = frame.shape[:2]
-        self.visible = detect_all_colors(hsv, self.app.color_ranges, self.app.blind_zones)
+        w, h = fd.size
+        self.visible = detect_all_colors(fd, self.app.color_ranges, self.app.blind_zones)
         for t in self.visible:
             dx, dy = pixel_to_degrees(t.cx, t.cy, w, h)
             self.target_map.add_sighting(
@@ -829,9 +998,9 @@ class Mission:
             self._move_to(*self.poses[self.index])
             return
 
-        self.plan = self.target_map.build_plan()
+        self.plan = self.target_map.build_plan(self.order)
         if not self.plan:
-            print("[MISSION] ไม่พบเป้าหมายเลย")
+            print("[MISSION] ไม่พบเป้าสีที่เลือก")
             self.phase = "DONE"
             return
         print(f"[MISSION] 📋 แผนยิง {len(self.plan)} เป้า:")
@@ -862,7 +1031,7 @@ class Mission:
         else:
             self.phase = "DONE"
 
-    def _step_engage(self, frame: np.ndarray, hsv: np.ndarray):
+    def _step_engage(self, fd: FrameData):
         app = self.app
         t = self.plan[self.index]
         now = time.monotonic()
@@ -875,11 +1044,15 @@ class Mission:
             return
 
         # หาเป้าสีนี้ที่ใกล้จุดอ้างอิงที่สุด: เฟรมแรกใช้จุดเล็ง เฟรมต่อไปใช้ตำแหน่งที่เจอล่าสุด (ไม่กระโดดไปเป้าข้างๆ)
-        h, w = frame.shape[:2]
-        self.visible = find_geometric_targets(build_mask(hsv, app.color_ranges[t.color], app.blind_zones), t.color)
+        # และขนาดต้องใกล้กับตอนกวาดหา (แบบโค้ดเพื่อน) กันสลับไปเล็งป้ายสีเดียวกันที่อยู่ติดกัน
+        w, h = fd.size
+        mask = build_mask(fd.hsv, app.color_ranges[t.color], app.blind_zones)
+        self.visible = find_targets(fd, mask, t.color)
         ref = self._last_match_deg or (AIM_OFFSET_X_DEG, AIM_OFFSET_Y_DEG)
         best, best_deg, best_dist = None, None, MATCH_RADIUS_DEG
         for cand in self.visible:
+            if not MATCH_AREA_RATIO[0] < cand.area / t.area < MATCH_AREA_RATIO[1]:
+                continue
             deg = pixel_to_degrees(cand.cx, cand.cy, w, h)
             dist = math.hypot(deg[0] - ref[0], deg[1] - ref[1])
             if dist < best_dist:
@@ -904,7 +1077,7 @@ class Mission:
         safe_call("gimbal drive", app.ep_gimbal.drive_speed,
                   pitch_speed=app.pid_pitch.compute(err_y), yaw_speed=app.pid_yaw.compute(err_x))
 
-        fire_state, should_fire = app.fire_ctrl.evaluate(err_x, err_y, app.tuning.is_open)
+        fire_state, should_fire = app.fire_ctrl.evaluate(err_x, err_y, app.is_tuning)
         self.state = f"{label} {fire_state}"
         if should_fire:
             if app._fire():
@@ -929,7 +1102,7 @@ class Mission:
     def print_summary(self, aborted: bool = False):
         print("\n=== สรุปภารกิจ" + (" (ถูกยกเลิก)" if aborted else "") + " ===")
         if not self.plan:
-            print("  ยังกวาดหาเป้าไม่เสร็จ" if self.phase == "SCAN" else "  ไม่พบเป้าหมาย")
+            print("  ยังกวาดหาเป้าไม่เสร็จ" if self.phase == "SCAN" else "  ไม่พบเป้าสีที่เลือก")
             return
         for i, t in enumerate(self.plan, 1):
             print(f"  {i}. {t.color.upper():<6} yaw {t.yaw:+6.1f}°  pitch {t.pitch:+5.1f}°  -> {t.status}")
@@ -941,17 +1114,32 @@ class Mission:
 # 11. แอปหลัก
 # ==========================================
 class AutoAimApp:
-    def __init__(self):
-        self.color_ranges, user_zones = load_config(CONFIG_PATH)
+    """ หน้าต่างเดียว 4 หน้าจอ: SETUP -> TUNE (= calibrate) , READY <-> MISSION """
+
+    def __init__(self, calibrate: bool = False):
+        self.color_ranges, user_zones, self.fire_order, found = load_config(CONFIG_PATH)
         self.blind_zones = BlindZones(AUTO_BLIND_ZONE, user_zones)
-        self.mode = MODE_PREVIEW
-        self.target_color = COLOR_ORDER[0]
+        # รันครั้งแรก (ยังไม่มีค่าที่ calibrate ไว้) ต้อง calibrate ก่อนเสมอ
+        self.calibrate = calibrate or not found
+        if not found:
+            print("[CONFIG] ยังไม่มีค่าสีที่ calibrate ไว้ -> เข้าโหมด CALIBRATE อัตโนมัติ")
+        elif not calibrate:
+            print(f"[CONFIG] ใช้ค่าที่ calibrate ไว้ (calibrate ใหม่: กดปุ่ม CALIBRATE ALL "
+                  f"หรือรัน python {Path(__file__).name} --calibrate)")
+
+        self.screen = SCREEN_READY
         self.mission: Optional[Mission] = None
+        self.ui = Ui()
+        self.running = True
+        self.tune_tab = 0              # หน้า TUNE: 0-3 = สีตาม COLOR_ORDER, 4 = ตรวจรวมทุกสี
+        self._calibrating = False      # อยู่ในขั้น calibrate เต็ม (SETUP -> TUNE)
+        self._order_fresh = True       # คลิกสีแรกหลังเข้าหน้า READY = เริ่มเรียงลำดับใหม่
+        self._ready_since = 0.0
+        self._last_result: List[str] = []
 
         self.pid_yaw = PIDController(**YAW_PID)
         self.pid_pitch = PIDController(**PITCH_PID)
         self.fire_ctrl = FireController()
-        self.tuning = TuningPanel()
 
         self.ep_robot = None
         self.ep_gimbal = None
@@ -964,19 +1152,20 @@ class AutoAimApp:
         self._last_frame_time: Optional[float] = None
         self._fire_banner_until = 0.0
 
+    @property
+    def is_tuning(self) -> bool:
+        """ อยู่ในหน้า calibrate/จูนสี = ห้ามยิงเด็ดขาด """
+        return self.screen in (SCREEN_SETUP, SCREEN_TUNE)
+
     # ---------- วงจรชีวิตโปรแกรม ----------
     def run(self):
         try:
             if not self._connect():
                 return
-            if not run_setup_phase(self.ep_camera, self.blind_zones):
-                print(">> ออกจากโปรแกรมตั้งแต่ขั้น Setup")
-                return
-            if not self._run_tuning_phase():
-                print(">> ออกจากโปรแกรมตั้งแต่ขั้นจูนสี")
-                return
-            save_config(CONFIG_PATH, self.color_ranges, self.blind_zones.user_zones)
-            self._recenter("ก่อนเริ่ม Loop หลัก")
+            if self.calibrate:
+                self._enter_setup()                # มี recenter อยู่ในนี้
+            else:
+                self._enter_ready(recenter=True)   # recenter ก่อนเริ่ม Loop หลักเสมอ
             self._main_loop()
         except KeyboardInterrupt:
             print("\n>> ได้รับ Ctrl+C")
@@ -1011,9 +1200,8 @@ class AutoAimApp:
         if self.mission is not None:
             self.mission.print_summary(aborted=True)
             self.mission = None
-        if self.tuning.is_open:
-            self.tuning.close()
-            save_config(CONFIG_PATH, self.color_ranges, self.blind_zones.user_zones)
+        if self.is_tuning:
+            print("[CONFIG] ออกระหว่าง calibrate/จูนสี: ค่าที่ยังไม่ได้กด SAVE จะไม่ถูกบันทึก")
 
         if self.ep_gimbal is not None:
             safe_call("gimbal stop", self.ep_gimbal.drive_speed, pitch_speed=0, yaw_speed=0)
@@ -1021,90 +1209,13 @@ class AutoAimApp:
             if action is not None:
                 safe_call("recenter wait", action.wait_for_completed, timeout=RECENTER_TIMEOUT_S)
         if self.leds is not None:
-            self.leds.all_off()
+            self.leds.close()
         if self._stream_started:
             safe_call("stop video", self.ep_camera.stop_video_stream)
         if self.ep_robot is not None:
             safe_call("robot close", self.ep_robot.close)
         cv2.destroyAllWindows()
         print("=== ปิดระบบเรียบร้อย ===")
-
-    # ---------- Tuning Phase: จูนทุกสีให้เสร็จก่อนเริ่ม ----------
-    def _run_tuning_phase(self) -> bool:
-        """ จูน HSV ทีละสีตาม COLOR_ORDER แล้วมีหน้าตรวจรวมทุกสี คืน False ถ้าผู้ใช้กดออก """
-        steps: List[Optional[str]] = list(COLOR_ORDER) + [None]  # None = หน้าตรวจรวมทุกสี
-        idx = 0
-        self.tuning.open(self.color_ranges[COLOR_ORDER[0]])
-        self._update_status_led()
-
-        print("\n" + "=" * 60)
-        print(" 🎨 TUNING: จูนสีทีละสี " + " -> ".join(c.upper() for c in COLOR_ORDER))
-        print(" - เลื่อน Trackbar จนหน้าต่าง Preview เห็นเฉพาะเป้าสีนั้นเป็นก้อนเต็ม")
-        print(" - [ENTER/SPACE/n] สีถัดไป  [p] ย้อนกลับ")
-        print(" - [i/k] หันขึ้น/ลง  [j/l] หันซ้าย/ขวา (ถ้าเป้าสีนั้นอยู่นอกภาพ)  [c] Recenter")
-        print(" - หน้าสุดท้ายตรวจรวมทุกสี: ทุกเป้าควรมีป้ายสีเดียวที่ถูกต้อง แล้วกด ENTER")
-        print(" - [q/ESC] ออก")
-        print("=" * 60 + "\n")
-
-        while True:
-            frame = read_frame(self.ep_camera)
-            if frame is not None:
-                color = steps[idx]
-                hsv = prepare_hsv(frame)
-                if color is not None:
-                    rng = self.tuning.read()
-                    if rng is None:  # ผู้ใช้ปิดหน้าต่าง Trackbar ไป -> เปิดใหม่ด้วยค่าล่าสุด
-                        self.tuning.open(self.color_ranges[color])
-                    else:
-                        self.color_ranges[color] = rng
-                    mask = build_mask(hsv, self.color_ranges[color], self.blind_zones)
-                    targets = find_geometric_targets(mask, color)
-                    self.tuning.show_preview(frame, mask)
-                    title = f"TUNING {idx + 1}/{len(COLOR_ORDER)}: {color.upper()} - {len(targets)} target(s)"
-                    detail = str(self.color_ranges[color])
-                    title_color = DISPLAY_COLORS[color]
-                else:
-                    targets = detect_all_colors(hsv, self.color_ranges, self.blind_zones)
-                    title = f"CHECK ALL COLORS - {len(targets)} target(s)"
-                    detail = "Each target should have ONE correct label. ENTER = start"
-                    title_color = (0, 255, 0)
-
-                self.blind_zones.draw(frame)
-                draw_targets(frame, targets)
-                put_text(frame, title, (15, 30), title_color, 0.7)
-                put_text(frame, detail, (15, 60), (255, 255, 255), 0.6)
-                put_text(frame, "[ENTER] next  [p] back  [i/j/k/l] move gimbal  [c] center  [q] quit",
-                         (15, 90), (200, 200, 200), 0.6)
-                cv2.imshow(MAIN_WINDOW, frame)
-
-            key = cv2.waitKey(1) & 0xFF
-            ch = key_char(key)
-            if ch == "q" or key == 27:
-                self.tuning.close()
-                return False
-            if key in (13, 10, 32) or ch == "n":
-                idx += 1
-                if idx == len(steps):
-                    break
-                if steps[idx] is None:
-                    self.tuning.close()
-                else:
-                    self.tuning.load(self.color_ranges[steps[idx]])
-            elif ch == "p" and idx > 0:
-                idx -= 1
-                if self.tuning.is_open:
-                    self.tuning.load(self.color_ranges[steps[idx]])
-                else:
-                    self.tuning.open(self.color_ranges[steps[idx]])
-            elif ch in NUDGE_KEYS:
-                pitch, yaw = NUDGE_KEYS[ch]
-                safe_call("gimbal move", self.ep_gimbal.move, pitch=pitch, yaw=yaw, pitch_speed=90, yaw_speed=90)
-            elif ch == "c":
-                self._recenter("ระหว่างจูนสี")
-
-        self._update_status_led()
-        print(">> ✅ จูนสีครบทุกสีแล้ว")
-        return True
 
     # ---------- Gimbal ----------
     def _reset_aim(self):
@@ -1125,12 +1236,11 @@ class AutoAimApp:
         self._reset_aim()
 
     def _fire(self) -> bool:
-        # ตรวจซ้ำอีกชั้นก่อนลั่นไก: โหมดจูนหรือ SAFE ต้องไม่ยิงเด็ดขาด
-        if self.tuning.is_open or not self.fire_ctrl.armed:
+        # ตรวจซ้ำอีกชั้นก่อนลั่นไก: ยิงได้เฉพาะระหว่างภารกิจ ไม่อยู่ในหน้าจูนสี และระบบยิงเปิดอยู่
+        if self.screen != SCREEN_MISSION or self.is_tuning or not self.fire_ctrl.armed:
             return False
         safe_call("gimbal stop", self.ep_gimbal.drive_speed, pitch_speed=0, yaw_speed=0)
-        color = self.plan_color() if self.mode == MODE_MISSION else self.target_color
-        print(f"🔥 ยิงเป้า {color.upper()}")
+        print(f"🔥 ยิงเป้า {self.mission.plan[self.mission.index].color.upper()}")
         safe_call("blaster fire", self.ep_blaster.fire, fire_type=blaster.WATER_FIRE, times=1)
         # ไม่สั่งไฟ Blaster กระพริบ; ดับไฟซ้ำเผื่อ firmware เปิดเองตอนยิง
         self.leds.silence_gimbal_lights()
@@ -1140,231 +1250,499 @@ class AutoAimApp:
         self._fire_banner_until = time.monotonic() + 0.3
         return True
 
-    def plan_color(self) -> str:
-        return self.mission.plan[self.mission.index].color
+    # ---------- เปลี่ยนหน้าจอ ----------
+    def _enter_setup(self):
+        self.screen = SCREEN_SETUP
+        self._calibrating = True
+        self.ui.zone_drawer = ZoneDrawer(self.blind_zones)
+        self.ui.zone_drawer.frame_size = (VIEW_W, VIEW_H)
+        self._recenter("เริ่ม calibrate")
+        self._update_status_led()
+        print(">> 🛠️ CALIBRATE 1/2: ลากเมาส์บนภาพกล้องเพื่อบังสิ่งที่ไม่ใช่เป้า แล้วกด NEXT")
 
-    # ---------- โหมดการทำงาน ----------
-    def _enter_mode(self, mode: str):
-        if self.mode == MODE_MISSION and mode != MODE_MISSION:
-            self._abort_mission()
-        if mode != self.mode:
-            print(f">> โหมด: {mode}")
-        self.mode = mode
+    def _enter_tune(self, calibrating: bool):
+        self.screen = SCREEN_TUNE
+        self._calibrating = calibrating
+        self.ui.zone_drawer = None
+        self.tune_tab = 0
         self._stop_gimbal()
         self._update_status_led()
+        print(">> 🎨 จูนสี: ลาก slider จนช่อง MASK PREVIEW เห็นเฉพาะเป้าสีนั้น แล้วกด NEXT / SAVE")
 
-    def _start_mission(self):
-        if self.tuning.is_open:
-            print(">> ⚠️ ปิดโหมดจูนสีก่อน (กด t) แล้วค่อยเริ่มภารกิจ")
+    def _finish_tuning(self):
+        self._save()
+        print(">> ✅ บันทึกค่าสีและพื้นที่ตาบอดแล้ว")
+        self._enter_ready(recenter=True)
+
+    def _cancel_calibration(self):
+        self.color_ranges, zones, _, _ = load_config(CONFIG_PATH)
+        self.blind_zones.user_zones = zones
+        print(">> ยกเลิก (ใช้ค่าเดิมที่บันทึกไว้)")
+        self._enter_ready(recenter=True)
+
+    def _enter_ready(self, recenter: bool = False):
+        """ กลับหน้า READY: ปลดระบบยิง หยุดหัว แล้วรอเลือกลำดับยิงรอบใหม่ """
+        self.screen = SCREEN_READY
+        self.mission = None
+        self._calibrating = False
+        self.ui.zone_drawer = None
+        if self.fire_ctrl.armed:
+            self.fire_ctrl.armed = False
+            print(">> Auto-Fire: OFF (SAFE)")
+        if recenter:
+            self._recenter("กลับหน้า READY")
+        else:
+            self._stop_gimbal()
+        self._order_fresh = True
+        self._ready_since = time.monotonic()
+        self._update_status_led()
+        self._print_order()
+
+    # ---------- ภารกิจ ----------
+    def _start_mission(self, fire: bool):
+        if not self.fire_order:
+            print(">> ⚠️ ยังไม่ได้เลือกสีที่จะยิง")
             return
-        if self.mode == MODE_MISSION:
-            return
-        self._enter_mode(MODE_MISSION)
-        self.mission = Mission(self)
-        print(f">> 🚀 เริ่มภารกิจ: กวาดหาเป้า {len(self.mission.poses)} มุม แล้วยิงตามลำดับ "
-              + " -> ".join(c.upper() for c in COLOR_ORDER))
-        if not self.fire_ctrl.armed:
-            print("   Auto-Fire ปิดอยู่ = ซ้อมเล็งอย่างเดียว (กด s เปิดยิงได้ระหว่างภารกิจ)")
+        if time.monotonic() - self._ready_since < START_KEY_GUARD_S:
+            return  # ไม่รับ ENTER ที่กดซ้ำ/ค้างมาจากหน้าก่อน กันเริ่มยิงโดยไม่ตั้งใจ
+
+        self._save()  # จำลำดับยิงไว้เป็นค่าเริ่มต้นของรอบหน้า
+        self._stop_gimbal()
+        self.fire_ctrl.armed = fire
+        self.screen = SCREEN_MISSION
+        self.mission = Mission(self, self.fire_order)
+        print(f">> 🚀 {'เริ่มยิง' if fire else 'ซ้อมเล็ง (ไม่ยิง)'} ตามลำดับ {self._order_text()} "
+              f"| กวาดหาเป้า {len(self.mission.poses)} มุม")
+        self._update_status_led()
+
+    def _mission_result(self, aborted: bool) -> List[str]:
+        m = self.mission
+        fired = sum(t.status == "FIRED" for t in m.plan)
+        head = f"Last mission{' (STOPPED)' if aborted else ''}: fired {fired}/{len(m.plan)} target(s)"
+        if not m.plan:
+            head += " - stopped while scanning" if m.phase == "SCAN" else " - no target of the chosen colors"
+        return [head] + m.progress_lines(per_line=8)
 
     def _abort_mission(self):
+        self._last_result = self._mission_result(aborted=True)
         self.mission.print_summary(aborted=True)
-        self.mission = None
-        if self.fire_ctrl.armed:
-            self.fire_ctrl.armed = False
-            print(">> Auto-Fire: OFF (SAFE) อัตโนมัติหลังยกเลิกภารกิจ")
+        self._enter_ready()
 
     def _finish_mission(self):
+        self._last_result = self._mission_result(aborted=False)
         self.mission.print_summary()
-        self.mission = None
-        self.mode = MODE_PREVIEW
-        if self.fire_ctrl.armed:
-            self.fire_ctrl.armed = False
-            print(">> Auto-Fire: OFF (SAFE) อัตโนมัติหลังจบภารกิจ")
-        self._recenter("จบภารกิจ")
-        self._update_status_led()
-
-    # ---------- Loop หลัก ----------
-    def _main_loop(self):
-        print(">> 🎯 พร้อมทำงาน | [m] ยิงทุกเป้า  [r/g/b/y] เล็งสีเดียว  [x] หยุด  [s] Auto-Fire  "
-              "[t] จูน  [c] Recenter  [q] ออก")
-        print(f">> Auto-Fire: {'ON' if self.fire_ctrl.armed else 'OFF (SAFE)'}")
-        cv2.namedWindow(MAIN_WINDOW)
-        while True:
-            frame = read_frame(self.ep_camera)
-            if frame is None:
-                # ไม่มีภาพ = ห้ามขยับตามข้อมูลเก่า (แต่ไม่ขัดจังหวะ moveto ที่กำลังหมุนอยู่)
-                if self.mode == MODE_TRACK or (self.mission is not None and self.mission.sub == "AIM"):
-                    self._stop_gimbal()
-            else:
-                self._process_frame(frame)
-            if not self._handle_key(cv2.waitKey(1) & 0xFF):
-                break
-
-    def _process_frame(self, frame: np.ndarray):
-        h, w = frame.shape[:2]
-        now = time.monotonic()
-        if self._last_frame_time is not None and now > self._last_frame_time:
-            self._fps = 0.9 * self._fps + 0.1 / (now - self._last_frame_time)
-        self._last_frame_time = now
-
-        # 1) อ่านค่า Trackbar (ถ้าเปิดโหมดจูนอยู่)
-        if self.tuning.is_open:
-            rng = self.tuning.read()
-            if rng is None:
-                self._set_tuning(False)  # หน้าต่างจูนถูกปิดด้วยปุ่ม X
-            else:
-                self.color_ranges[self.target_color] = rng
-        tuning = self.tuning.is_open
-
-        hsv = prepare_hsv(frame)
-        if tuning:
-            self.tuning.show_preview(frame, build_mask(hsv, self.color_ranges[self.target_color], self.blind_zones))
-
-        # 2) Vision + ควบคุมตามโหมด
-        if self.mode == MODE_MISSION:
-            self.mission.step(frame, hsv)
-            state, targets = self.mission.state, self.mission.visible
-            match, error = self.mission.match, self.mission.error
-            if self.mission.done:
-                self._finish_mission()
-        elif self.mode == MODE_TRACK:
-            state, targets, match, error = self._step_track(hsv, w, h, tuning)
-        else:
-            targets, match, error = detect_all_colors(hsv, self.color_ranges, self.blind_zones), None, None
-            state = f"{len(targets)} target(s) in view - press [m] to fire at all"
-
-        self.leds.keep_top_off()
-        self._draw_hud(frame, targets, match, error, state)
-        cv2.imshow(MAIN_WINDOW, frame)
-
-    def _step_track(self, hsv: np.ndarray, w: int, h: int, tuning: bool):
-        mask = build_mask(hsv, self.color_ranges[self.target_color], self.blind_zones)
-        targets = find_geometric_targets(mask, self.target_color)
-        best = targets[0] if targets else None
-        if best is None:
-            self._stop_gimbal()
-            return "SEARCHING", targets, None, None
-        if tuning and not TRACK_WHILE_TUNING:
-            self._stop_gimbal()
-            return "TUNING - GIMBAL HOLD", targets, best, None
-
-        deg_x, deg_y = pixel_to_degrees(best.cx, best.cy, w, h)
-        error = (deg_x - AIM_OFFSET_X_DEG, deg_y - AIM_OFFSET_Y_DEG)
-        yaw_speed = self.pid_yaw.compute(error[0])
-        pitch_speed = self.pid_pitch.compute(error[1])
-        safe_call("gimbal drive", self.ep_gimbal.drive_speed, pitch_speed=pitch_speed, yaw_speed=yaw_speed)
-
-        state, should_fire = self.fire_ctrl.evaluate(error[0], error[1], tuning)
-        if should_fire:
-            self._fire()
-        return state, targets, best, error
-
-    def _draw_hud(self, frame, targets: List[Target], match: Optional[Target],
-                  error: Optional[Tuple[float, float]], state: str):
-        h, w = frame.shape[:2]
-        self.blind_zones.draw(frame)
-
-        # จุดเล็ง + กรอบระยะ LOCK_TOLERANCE_DEG
-        ax, ay = degrees_to_pixel(AIM_OFFSET_X_DEG, AIM_OFFSET_Y_DEG, w, h)
-        tol_x = int(LOCK_TOLERANCE_DEG * w / FOV_X)
-        tol_y = int(LOCK_TOLERANCE_DEG * h / FOV_Y)
-        cv2.rectangle(frame, (ax - tol_x, ay - tol_y), (ax + tol_x, ay + tol_y), (200, 200, 200), 1)
-        cv2.drawMarker(frame, (ax, ay), (255, 255, 255), markerType=cv2.MARKER_CROSS, markerSize=24, thickness=2)
-
-        draw_targets(frame, targets)
-        if match is not None:
-            bgr = DISPLAY_COLORS[match.color]
-            cv2.circle(frame, (match.cx, match.cy), 14, bgr, 2)
-            cv2.line(frame, (ax, ay), (match.cx, match.cy), bgr, 2)
-
-        if time.monotonic() < self._fire_banner_until:
-            put_text(frame, "FIRE!", (ax - 45, ay - tol_y - 15), (0, 0, 255), 1.1, 3)
-
-        if state.endswith("FIRE"):
-            state_color = (0, 0, 255)
-        elif "SETTLING" in state or "LOCKED" in state:
-            state_color = (0, 255, 255)
-        else:
-            state_color = (255, 255, 255)
-
-        mode_text = f"TRACK {self.target_color.upper()}" if self.mode == MODE_TRACK else self.mode
-        fire_text = "ON" if self.fire_ctrl.armed else "OFF (SAFE)"
-        lines = [
-            (f"Mode: {mode_text} | Auto-Fire: {fire_text} | FPS: {self._fps:.0f}", (255, 255, 255)),
-            (f"State: {state}", state_color),
-        ]
-        if error is not None:
-            lines.append((f"Error: X {error[0]:+.1f} deg  Y {error[1]:+.1f} deg", (255, 255, 255)))
-        if self.mission is not None:
-            lines.extend((text, (255, 255, 0)) for text in self.mission.progress_lines())
-        if self.tuning.is_open:
-            lines.append((f"TUNING {self.target_color.upper()} - FIRE DISABLED", (0, 165, 255)))
-            lines.append((str(self.color_ranges[self.target_color]), (0, 165, 255)))
-        lines.append(("[m] mission  [r/g/b/y] track  [x] stop  [s] fire  [t] tune  [c] center  [q] quit",
-                      (200, 200, 200)))
-
-        y = 30
-        for text, color in lines:
-            put_text(frame, text, (15, y), color, 0.6)
-            y += 28
-
-    # ---------- คีย์บอร์ด ----------
-    def _handle_key(self, key: int) -> bool:
-        """ คืนค่า False เมื่อต้องการออกจากโปรแกรม """
-        ch = key_char(key)
-        if ch == "q" or key == 27:
-            return False
-        if ch == "m":
-            self._start_mission()
-        elif ch in KEY_TO_COLOR:
-            if not self.tuning.is_open:
-                self._enter_mode(MODE_TRACK)
-            self._select_color(KEY_TO_COLOR[ch])
-        elif ch == "x" or key == 32:
-            self._enter_mode(MODE_PREVIEW)
-        elif ch == "t":
-            if self.mode == MODE_MISSION:
-                self._enter_mode(MODE_PREVIEW)
-            self._set_tuning(not self.tuning.is_open)
-        elif ch == "s":
-            self._toggle_auto_fire()
-        elif ch == "c":
-            if self.mode == MODE_MISSION:
-                self._enter_mode(MODE_PREVIEW)
-            self._recenter("กดปุ่ม c")
-        return True
-
-    def _select_color(self, color: str):
-        self.target_color = color
-        self._reset_aim()
-        if self.tuning.is_open:
-            self.tuning.load(self.color_ranges[color])
-        self._update_status_led()
-        print(f">> เลือกสี: {color.upper()} [{self.color_ranges[color]}]")
-
-    def _set_tuning(self, enabled: bool):
-        if enabled:
-            self.tuning.open(self.color_ranges[self.target_color])
-            print(f">> 🛠️ เปิดโหมดจูนสี {self.target_color.upper()} (ระบบยิงถูกล็อก, กด r/g/b/y เพื่อสลับสี)")
-        else:
-            self.tuning.close()
-            save_config(CONFIG_PATH, self.color_ranges, self.blind_zones.user_zones)
-            print(">> ปิดโหมดจูนสี")
-        self._reset_aim()
-        self._update_status_led()
+        self._enter_ready(recenter=True)
 
     def _toggle_auto_fire(self):
         self.fire_ctrl.armed = not self.fire_ctrl.armed
         self.fire_ctrl.reset_lock()  # ต้องนิ่งครบ SETTLE_TIME_S ใหม่หลังเปิดระบบยิง
-        print(f">> Auto-Fire: {'ON ⚠️' if self.fire_ctrl.armed else 'OFF (SAFE)'}")
-        if self.fire_ctrl.armed and self.tuning.is_open:
-            print("   (จะยังไม่ยิงจนกว่าจะปิดโหมดจูนสี)")
+        print(f">> Auto-Fire: {'ON ⚠️' if self.fire_ctrl.armed else 'OFF (SAFE) - ซ้อมเล็งต่อจนจบ'}")
         self._update_status_led()
 
+    # ---------- ลำดับยิง ----------
+    def _toggle_order(self, color: str):
+        if self._order_fresh:
+            self.fire_order = []  # คลิกสีแรกหลังเข้าหน้า READY = เริ่มเรียงลำดับใหม่
+            self._order_fresh = False
+        if color in self.fire_order:
+            self.fire_order.remove(color)  # คลิกสีที่เลือกไว้แล้ว = เอาออก
+        else:
+            self.fire_order.append(color)
+        self._print_order()
+
+    def _undo_order(self):
+        self._order_fresh = False
+        if self.fire_order:
+            self.fire_order.pop()
+        self._print_order()
+
+    def _clear_order(self):
+        self._order_fresh = False
+        self.fire_order = []
+        self._print_order()
+
+    def _order_text(self, sep: str = " -> ") -> str:
+        return sep.join(c.upper() for c in self.fire_order)
+
+    def _print_order(self):
+        print(f">> ลำดับยิง: {self._order_text() or '(ยังไม่ได้เลือก)'}")
+
+    # ---------- ปุ่ม (เมาส์ + คีย์บอร์ด ใช้ action เดียวกัน) ----------
+    def _key_to_action(self, key: int) -> Optional[str]:
+        ch = key_char(key)
+        if ch == "q" or key == 27:
+            return "quit"
+        enter = key in (13, 10)
+        if self.screen == SCREEN_READY:
+            if ch in KEY_TO_COLOR:
+                return "order:" + KEY_TO_COLOR[ch]
+            if ch == "u" or key in (8, 127):  # Backspace บน macOS = 127
+                return "undo"
+            if enter:
+                return "start"
+            return {"x": "clear", "d": "dry", "t": "tune", "c": "center"}.get(ch)
+        if self.screen == SCREEN_MISSION:
+            if ch == "x" or key == 32:
+                return "stop"
+            return {"s": "fire_toggle", "c": "stop_center"}.get(ch)
+        if self.screen == SCREEN_SETUP:
+            if enter or key == 32:
+                return "next"
+            return {"u": "zone_undo", "x": "zone_clear"}.get(ch)
+        if self.screen == SCREEN_TUNE:
+            if ch in KEY_TO_COLOR:
+                return "tab:" + KEY_TO_COLOR[ch]
+            if ch in NUDGE_KEYS:
+                return "nudge:" + ch
+            if enter or key == 32 or ch == "n":
+                return "next"
+            return {"v": "tab:check", "p": "back", "t": "done", "c": "center"}.get(ch)
+        return None
+
+    def _do(self, action: str):
+        if action == "quit":
+            self.running = False
+        elif self.screen == SCREEN_READY:
+            if action.startswith("order:"):
+                self._toggle_order(action.split(":", 1)[1])
+            elif action == "undo":
+                self._undo_order()
+            elif action == "clear":
+                self._clear_order()
+            elif action == "start":
+                self._start_mission(fire=True)
+            elif action == "dry":
+                self._start_mission(fire=False)
+            elif action == "tune":
+                self._enter_tune(calibrating=False)
+            elif action == "calibrate":
+                self._enter_setup()
+            elif action == "center":
+                self._recenter("กดปุ่ม RECENTER")
+        elif self.screen == SCREEN_MISSION:
+            if action == "stop":
+                self._abort_mission()
+            elif action == "fire_toggle":
+                self._toggle_auto_fire()
+            elif action == "stop_center":
+                self._abort_mission()
+                self._recenter("กดปุ่ม STOP + RECENTER")
+        elif self.screen == SCREEN_SETUP:
+            if action == "zone_undo" and self.blind_zones.user_zones:
+                self.blind_zones.user_zones.pop()
+            elif action == "zone_clear":
+                self.blind_zones.user_zones.clear()
+            elif action == "next":
+                self._enter_tune(calibrating=True)
+            elif action == "cancel":
+                self._cancel_calibration()
+        elif self.screen == SCREEN_TUNE:
+            if action.startswith("tab:"):
+                tab = action.split(":", 1)[1]
+                self.tune_tab = len(COLOR_ORDER) if tab == "check" else COLOR_ORDER.index(tab)
+            elif action == "next":
+                if self.tune_tab >= len(COLOR_ORDER):
+                    self._finish_tuning()
+                else:
+                    self.tune_tab += 1
+            elif action == "back":
+                self.tune_tab = max(0, self.tune_tab - 1)
+            elif action == "done":
+                self._finish_tuning()
+            elif action == "cancel":
+                self._cancel_calibration()
+            elif action == "reset_color" and self.tune_tab < len(COLOR_ORDER):
+                color = COLOR_ORDER[self.tune_tab]
+                self.color_ranges[color] = HSVRange(*DEFAULT_HSV[color])
+                print(f">> คืนค่าเริ่มต้นสี {color.upper()} [{self.color_ranges[color]}] (กด SAVE เพื่อบันทึก)")
+            elif action.startswith("nudge:"):
+                pitch, yaw = NUDGE_KEYS[action.split(":", 1)[1]]
+                safe_call("gimbal move", self.ep_gimbal.move, pitch=pitch, yaw=yaw, pitch_speed=90, yaw_speed=90)
+            elif action == "center":
+                self._recenter("กดปุ่ม CENTER")
+
+    # ---------- Loop หลัก ----------
+    def _main_loop(self):
+        cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_AUTOSIZE)
+        cv2.setMouseCallback(WINDOW_NAME, self.ui.on_mouse)
+        while self.running:
+            frame = read_frame(self.ep_camera)
+            if frame is None:
+                # ไม่มีภาพ = ห้ามขยับตามข้อมูลเก่า (แต่ไม่ขัดจังหวะ moveto ที่กำลังหมุนอยู่)
+                if self.mission is not None and self.mission.sub == "AIM":
+                    self._stop_gimbal()
+            else:
+                self._process_frame(frame)
+            action = self._key_to_action(cv2.waitKey(1) & 0xFF)
+            if action is not None:
+                self.ui.actions.append(action)
+            while self.ui.actions and self.running:
+                self._do(self.ui.actions.popleft())
+
+    def _process_frame(self, frame: np.ndarray):
+        now = time.monotonic()
+        if self._last_frame_time is not None and now > self._last_frame_time:
+            fps = 1.0 / (now - self._last_frame_time)
+            self._fps = fps if self._fps == 0 else 0.9 * self._fps + 0.1 * fps
+        self._last_frame_time = now
+
+        fd = prepare_frame(frame)
+        targets: List[Target] = []
+        match, error, mask = None, None, None
+        if self.screen == SCREEN_MISSION:
+            self.mission.step(fd)
+            state, targets = self.mission.state, self.mission.visible
+            match, error = self.mission.match, self.mission.error
+            if self.mission.done:
+                self._finish_mission()
+        elif self.screen == SCREEN_SETUP:
+            state = f"{len(self.blind_zones.user_zones)} blind zone(s) drawn"
+        elif self.screen == SCREEN_TUNE and self.tune_tab < len(COLOR_ORDER):
+            color = COLOR_ORDER[self.tune_tab]
+            mask = build_mask(fd.hsv, self.color_ranges[color], self.blind_zones)
+            targets = find_targets(fd, mask, color)
+            state = f"Tuning {color.upper()}: {len(targets)} target(s) found"
+        else:  # READY และหน้าตรวจรวมทุกสี
+            targets = detect_all_colors(fd, self.color_ranges, self.blind_zones)
+            state = f"{len(targets)} target(s) in view"
+
+        self._render(fd, targets, match, error, state, mask)
+
+    # ---------- วาดหน้าจอ ----------
+    def _render(self, fd: FrameData, targets, match, error, state, mask):
+        canvas = np.full((CANVAS_H, CANVAS_W, 3), UI_BG, np.uint8)
+        w, h = fd.size
+        if (w, h) == (VIEW_W, VIEW_H):  # สตรีม 540p = ขนาดช่องภาพพอดี ไม่ต้องย่อ
+            canvas[:VIEW_H, :VIEW_W] = fd.bgr
+        else:
+            canvas[:VIEW_H, :VIEW_W] = cv2.resize(fd.bgr, (VIEW_W, VIEW_H), interpolation=cv2.INTER_AREA)
+        self._draw_view(canvas[:VIEW_H, :VIEW_W], VIEW_W / w, targets, match)
+        cv2.rectangle(canvas, (VIEW_W, 0), (CANVAS_W, CANVAS_H), UI_PANEL, -1)
+        self.ui.begin()
+        self._draw_panel(canvas, state, error)
+        self._draw_strip(canvas, fd.bgr, mask, targets)
+        cv2.imshow(WINDOW_NAME, canvas)
+
+    def _draw_view(self, view, scale, targets, match):
+        """ ภาพกล้อง: พื้นที่ตาบอด, จุดเล็ง, เป้าที่ตรวจเจอ """
+        if self.screen == SCREEN_SETUP:
+            self.blind_zones.draw(view, fill_alpha=0.55)
+            d = self.ui.zone_drawer
+            if d is not None and d.drag_start is not None and d.drag_end is not None:
+                cv2.rectangle(view, d.drag_start, d.drag_end, (0, 255, 255), 2)
+            put_text(view, "Drag on this image to hide anything that is NOT a target", (12, 28), (0, 255, 255), 0.6)
+            return
+
+        self.blind_zones.draw(view)
+        ax, ay = degrees_to_pixel(AIM_OFFSET_X_DEG, AIM_OFFSET_Y_DEG, VIEW_W, VIEW_H)
+        tol_x = max(3, int(LOCK_TOLERANCE_X_DEG * VIEW_W / FOV_X))
+        tol_y = max(3, int(LOCK_TOLERANCE_Y_DEG * VIEW_H / FOV_Y))
+        cv2.rectangle(view, (ax - tol_x, ay - tol_y), (ax + tol_x, ay + tol_y), (200, 200, 200), 1)
+        cv2.drawMarker(view, (ax, ay), (255, 255, 255), markerType=cv2.MARKER_CROSS, markerSize=22, thickness=2)
+
+        draw_targets(view, targets, scale)
+        if match is not None:
+            bgr = DISPLAY_COLORS[match.color]
+            mx, my = int(match.cx * scale), int(match.cy * scale)
+            cv2.circle(view, (mx, my), 12, bgr, 2)
+            cv2.line(view, (ax, ay), (mx, my), bgr, 2)
+        if time.monotonic() < self._fire_banner_until:
+            put_text(view, "FIRE!", (ax - 40, ay - tol_y - 12), (0, 0, 255), 1.0, 3)
+
+    def _screen_badge(self) -> Tuple[str, Tuple[int, int, int]]:
+        if self.screen == SCREEN_SETUP:
+            return "CALIBRATE 1/2: BLIND ZONES", UI_ORANGE
+        if self.screen == SCREEN_TUNE:
+            return ("CALIBRATE 2/2: COLORS" if self._calibrating else "TUNE COLORS"), UI_ORANGE
+        if self.screen == SCREEN_MISSION:
+            return ("MISSION - FIRING", UI_RED) if self.fire_ctrl.armed else ("MISSION - DRY RUN", UI_BLUE)
+        return "READY", UI_GREEN
+
+    def _draw_panel(self, canvas, state: str, error):
+        """ แผงขวา: สถานะ + ปุ่มของหน้าจอปัจจุบัน """
+        px, bw = VIEW_W + 16, PANEL_W - 32
+        label(canvas, "ROBOMASTER AUTO-AIM", px, 28, UI_TEXT, 0.6, 2)
+        badge, badge_color = self._screen_badge()
+        cv2.rectangle(canvas, (px, 40), (px + bw, 70), badge_color, -1)
+        label(canvas, badge, px + 10, 61, text_color_for(badge_color), 0.55, 1, max_w=bw - 20)
+
+        fire_text, fire_color = ("FIRE: ARMED", (90, 90, 255)) if self.fire_ctrl.armed else ("FIRE: SAFE", UI_OK)
+        label(canvas, f"FPS {self._fps:.0f}", px, 94, UI_DIM)
+        label(canvas, fire_text, px + 100, 94, fire_color, 0.5, 2)
+        for i, line in enumerate(textwrap.wrap(state, 36)[:2]):
+            label(canvas, line, px, 116 + i * 18, UI_TEXT, 0.45)
+        if error is not None:
+            label(canvas, f"Error  X {error[0]:+.1f}  Y {error[1]:+.1f} deg", px, 152, UI_DIM, 0.45)
+
+        panels = {SCREEN_READY: self._panel_ready, SCREEN_MISSION: self._panel_mission,
+                  SCREEN_SETUP: self._panel_setup, SCREEN_TUNE: self._panel_tune}
+        panels[self.screen](canvas, px, 172, bw)
+        self.ui.button(canvas, px, CANVAS_H - 50, bw, 36, "QUIT (q)", "quit", (70, 60, 110))
+
+    def _color_chips(self, canvas, px, y, bw, action_prefix, is_selected, caption_for):
+        chip_w = (bw - 3 * 8) // 4
+        for i, color in enumerate(COLOR_ORDER):
+            selected = is_selected(color)
+            self.ui.button(canvas, px + i * (chip_w + 8), y, chip_w, 42, caption_for(color),
+                           action_prefix + color, DISPLAY_COLORS[color] if selected else dim(DISPLAY_COLORS[color]),
+                           selected=selected)
+
+    def _panel_ready(self, canvas, px, y, bw):
+        half = (bw - 8) // 2
+        label(canvas, "FIRE ORDER - click colors in order", px, y, UI_DIM, 0.45, max_w=bw)
+
+        def caption(color):
+            short = COLOR_SHORT[color]
+            return f"{self.fire_order.index(color) + 1}:{short}" if color in self.fire_order else short
+
+        self._color_chips(canvas, px, y + 10, bw, "order:", lambda c: c in self.fire_order, caption)
+        y += 72
+        label(canvas, f"Order: {self._order_text(' > ') or '(none)'}", px, y, (0, 255, 255), 0.5, 1, max_w=bw)
+        y += 12
+        self.ui.button(canvas, px, y, half, 34, "UNDO (u)", "undo")
+        self.ui.button(canvas, px + half + 8, y, half, 34, "CLEAR (x)", "clear")
+        y += 48
+        can_start = bool(self.fire_order)
+        self.ui.button(canvas, px, y, bw, 58, "START FIRING (ENTER)", "start", UI_RED, enabled=can_start)
+        y += 68
+        self.ui.button(canvas, px, y, bw, 38, "DRY RUN - AIM ONLY (d)", "dry", UI_BLUE, enabled=can_start)
+        y += 56
+        self.ui.button(canvas, px, y, half, 38, "TUNE COLORS (t)", "tune")
+        self.ui.button(canvas, px + half + 8, y, half, 38, "CALIBRATE ALL", "calibrate")
+        y += 48
+        self.ui.button(canvas, px, y, bw, 36, "RECENTER GIMBAL (c)", "center")
+
+    def _panel_mission(self, canvas, px, y, bw):
+        self.ui.button(canvas, px, y, bw, 70, "STOP (x / SPACE)", "stop", UI_RED)
+        y += 84
+        if self.fire_ctrl.armed:
+            self.ui.button(canvas, px, y, bw, 44, "FIRE ON - click for SAFE (s)", "fire_toggle", (40, 40, 150))
+        else:
+            self.ui.button(canvas, px, y, bw, 44, "SAFE - click to ARM FIRE (s)", "fire_toggle", UI_GREEN)
+        y += 56
+        self.ui.button(canvas, px, y, bw, 38, "STOP + RECENTER (c)", "stop_center")
+        y += 60
+        label(canvas, f"Order: {self._order_text(' > ')}", px, y, (0, 255, 255), 0.5, 1, max_w=bw)
+
+    def _panel_setup(self, canvas, px, y, bw):
+        half = (bw - 8) // 2
+        for line in ("Drag on the camera image to", "hide things that are NOT targets.",
+                     "Orange box = robot's own gimbal", "(always hidden)."):
+            label(canvas, line, px, y, UI_TEXT, 0.48)
+            y += 20
+        y += 6
+        label(canvas, f"Blind zones drawn: {len(self.blind_zones.user_zones)}", px, y, (0, 255, 255))
+        y += 14
+        self.ui.button(canvas, px, y, half, 34, "UNDO ZONE (u)", "zone_undo")
+        self.ui.button(canvas, px + half + 8, y, half, 34, "CLEAR (x)", "zone_clear")
+        y += 50
+        self.ui.button(canvas, px, y, bw, 56, "NEXT: TUNE COLORS (ENTER)", "next", UI_GREEN)
+        y += 70
+        self.ui.button(canvas, px, y, bw, 34, "CANCEL (keep saved values)", "cancel")
+
+    def _panel_tune(self, canvas, px, y, bw):
+        half = (bw - 8) // 2
+        third = (bw - 16) // 3
+        label(canvas, "COLOR TO TUNE (r/g/b/y)", px, y, UI_DIM, 0.45)
+        tab = self.tune_tab
+        self._color_chips(canvas, px, y + 10, bw, "tab:",
+                          lambda c: tab < len(COLOR_ORDER) and COLOR_ORDER[tab] == c, lambda c: COLOR_SHORT[c])
+        y += 60
+        self.ui.button(canvas, px, y, bw, 32, "CHECK ALL COLORS (v)", "tab:check",
+                       selected=tab == len(COLOR_ORDER))
+        y += 50
+        label(canvas, "MOVE GIMBAL (target off-screen?)", px, y, UI_DIM, 0.45, max_w=bw)
+        y += 10
+        mid = px + third + 8
+        self.ui.button(canvas, mid, y, third, 30, "UP (i)", "nudge:i")
+        y += 36
+        self.ui.button(canvas, px, y, third, 30, "LEFT (j)", "nudge:j")
+        self.ui.button(canvas, mid, y, third, 30, "CENTER (c)", "center")
+        self.ui.button(canvas, px + 2 * (third + 8), y, third, 30, "RIGHT (l)", "nudge:l")
+        y += 36
+        self.ui.button(canvas, mid, y, third, 30, "DOWN (k)", "nudge:k")
+        y += 46
+        last = tab >= len(COLOR_ORDER)
+        self.ui.button(canvas, px, y, half, 34, "< BACK (p)", "back", enabled=tab > 0)
+        self.ui.button(canvas, px + half + 8, y, half, 34, "FINISH (n)" if last else "NEXT > (n)", "next")
+        y += 46
+        self.ui.button(canvas, px, y, bw, 44, "SAVE & FINISH (t)", "done", UI_GREEN)
+        y += 54
+        self.ui.button(canvas, px, y, bw, 32, "CANCEL (keep saved values)", "cancel")
+        y += 42
+        self.ui.button(canvas, px, y, bw, 32, "RESET THIS COLOR TO DEFAULT", "reset_color",
+                       enabled=tab < len(COLOR_ORDER))
+
+    def _draw_strip(self, canvas, frame, mask, targets: List[Target]):
+        """ แถบล่าง: slider จูนสี + ภาพ Mask หรือคำแนะนำ/ผลภารกิจ """
+        y0 = VIEW_H
+        cv2.line(canvas, (0, y0), (VIEW_W, y0), (80, 80, 80), 1)
+        if self.screen == SCREEN_TUNE and self.tune_tab < len(COLOR_ORDER):
+            self._strip_sliders(canvas, frame, mask, COLOR_ORDER[self.tune_tab])
+            return
+
+        counts = " | ".join(f"{c.upper()} {sum(t.color == c for t in targets)}" for c in COLOR_ORDER)
+        if self.screen == SCREEN_SETUP:
+            lines = [("STEP 1/2 - BLIND ZONES", UI_ORANGE),
+                     ("Mouse: press, drag and release on the camera image = add one blind zone", UI_TEXT),
+                     ("The robot will never see or shoot inside the dark boxes.", UI_TEXT)]
+            keys = "u = undo zone   x = clear zones   ENTER = next step   q = quit"
+        elif self.screen == SCREEN_TUNE:
+            lines = [("CHECK ALL COLORS", UI_ORANGE), (f"In view: {counts}", (0, 255, 255)),
+                     ("Every target should show exactly ONE correct label.", UI_TEXT),
+                     ("Wrong or double label? Click that color above and tune it again.", UI_TEXT)]
+            keys = "r/g/b/y = tune color   p = back   t = save & finish   q = quit"
+        elif self.screen == SCREEN_MISSION:
+            m = self.mission
+            lines = [(m.state, UI_TEXT)] + [(text, (0, 255, 255)) for text in m.progress_lines(per_line=8)]
+            keys = "x / SPACE = stop now   s = fire on/off   c = stop + recenter   q = quit"
+        else:
+            lines = [(f"In view: {counts}", (0, 255, 255)),
+                     ("Click color chips (or r/g/b/y) in firing order, then START FIRING.", UI_TEXT),
+                     ("The robot scans around first, then fires at every target of those colors.", UI_TEXT)]
+            lines += [(text, UI_DIM) for text in self._last_result]
+            keys = "r/g/b/y = order  u = undo  x = clear  ENTER = fire  d = dry run  t = tune  c = center  q = quit"
+
+        for i, (text, color) in enumerate(lines[:6]):
+            label(canvas, text, 16, y0 + 26 + i * 22, color, 0.5, 1, max_w=VIEW_W - 32)
+        label(canvas, keys, 16, CANVAS_H - 12, UI_DIM, 0.45, 1, max_w=VIEW_W - 32)
+
+    def _strip_sliders(self, canvas, frame, mask, color: str):
+        y0 = VIEW_H
+        rng = self.color_ranges[color]
+        sliders = (("H min", "h_min", 179, True), ("H max", "h_max", 179, True),
+                   ("S min", "s_min", 255, False), ("S max", "s_max", 255, False),
+                   ("V min", "v_min", 255, False), ("V max", "v_max", 255, False))
+        for i, (text, name, max_value, hue) in enumerate(sliders):
+            x = 20 + (i % 2) * 310
+            y = y0 + 12 + (i // 2) * 50
+            self.ui.slider(canvas, x, y, 290, text, getattr(rng, name), max_value,
+                           self._slider_setter(color, name), hue)
+        hint = "H min > H max = hue wraps around (used for RED)" if rng.wraps else \
+            "S min up = ignore pale colors   V min up = ignore shadows"
+        label(canvas, hint, 20, CANVAS_H - 12, UI_DIM, 0.45)
+
+        # ภาพเฉพาะพิกเซลที่ผ่านช่วงสี (สีจริง) ด้านขวาของแถบล่าง
+        preview = cv2.bitwise_and(frame, frame, mask=mask)
+        canvas[y0:CANVAS_H, VIEW_W - 320:VIEW_W] = cv2.resize(preview, (320, STRIP_H), interpolation=cv2.INTER_AREA)
+        cv2.rectangle(canvas, (VIEW_W - 320, y0), (VIEW_W - 1, CANVAS_H - 1), (90, 90, 90), 1)
+        put_text(canvas, f"MASK PREVIEW: {color.upper()}", (VIEW_W - 312, y0 + 20), (255, 255, 255), 0.5, 1)
+
+    def _slider_setter(self, color: str, name: str) -> Callable[[int], None]:
+        def setter(value: int):
+            self.color_ranges[color] = replace(self.color_ranges[color], **{name: value})
+        return setter
+
+    # ---------- อื่นๆ ----------
     def _update_status_led(self):
-        color = self.target_color if self.mode == MODE_TRACK else "white"
-        self.leds.show_status(color, self.fire_ctrl.armed, self.tuning.is_open)
+        self.leds.show_status("white", self.fire_ctrl.armed, self.is_tuning)
+
+    def _save(self):
+        save_config(CONFIG_PATH, self.color_ranges, self.blind_zones.user_zones, self.fire_order)
 
 
 if __name__ == "__main__":
-    AutoAimApp().run()
+    parser = argparse.ArgumentParser(description="RoboMaster EP ยิงเป้าตามลำดับสีอัตโนมัติ")
+    parser.add_argument("--calibrate", action="store_true",
+                        help="เริ่มที่หน้า calibrate (วาดพื้นที่ตาบอด + จูนสีครบทุกสี) รันครั้งแรกจะทำให้อัตโนมัติ")
+    AutoAimApp(calibrate=parser.parse_args().calibrate).run()

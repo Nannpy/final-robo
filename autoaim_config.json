@@ -11,27 +11,33 @@
     "green": {
       "h_min": 35,
       "h_max": 90,
-      "s_min": 109,
+      "s_min": 70,
       "s_max": 255,
-      "v_min": 30,
+      "v_min": 5,
       "v_max": 255
     },
     "blue": {
       "h_min": 95,
       "h_max": 130,
-      "s_min": 70,
+      "s_min": 104,
       "s_max": 255,
-      "v_min": 50,
+      "v_min": 11,
       "v_max": 255
     },
     "yellow": {
       "h_min": 20,
       "h_max": 35,
-      "s_min": 153,
+      "s_min": 231,
       "s_max": 255,
-      "v_min": 100,
+      "v_min": 83,
       "v_max": 255
     }
   },
-  "user_blind_zones": []
+  "user_blind_zones": [],
+  "fire_order": [
+    "blue",
+    "red",
+    "green",
+    "yellow"
+  ]
 }
