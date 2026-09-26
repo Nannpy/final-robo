@@ -11,24 +11,28 @@ RoboMaster EP - สำรวจเขาวงกต (รอบ 1) แล้ว�
     แล้วคำนวณจากมุมก้มว่าเป้าอยู่ช่องติดกันจริงไหม -> ช่องเป้าห้ามเดินเข้า ยิงจากช่องข้างๆ
 
 รอบ 1 (EXPLORE): เดินให้ครบทุกช่องที่ไปถึงได้ ทุกช่องหันหัววัดกำแพงและหาเป้าทุกทิศ -> ได้แผนที่ + ตำแหน่งเป้า
-รอบ 2 (SHOOT)  : เริ่มจาก start (หุ่นวิ่งกลับเอง) หรือจากจุดที่อยู่ -> ไปทีละเป้า ยิง -> จบตามที่เลือก
-                 ลำดับเป้า: ทางสั้นสุดครบทุกเป้า (ค่าเริ่มต้น) หรือเรียงตามสีที่เลือกเอง
+          จบแล้วหุ่นหยุดตรงที่สำรวจเสร็จ แผนที่เซฟลง maze_map.json ทุกช่องที่สำรวจ (ล่มกลางทางก็สำรวจต่อได้)
+รอบ 2 (SHOOT)  : ยกหุ่นไปวางที่ start หันทิศเดิม (PLACED AT START = ค่าเริ่มต้น) -> ไปทีละเป้า ยิง -> จบตามที่เลือก
+                 ลำดับเป้า: ทางสั้นสุดครบทุกเป้าที่ไปถึงได้ (ค่าเริ่มต้น) หรือเรียงตามสีที่เลือกเอง
 
 วิธีรัน (calibrate สีด้วย gimbalshoot.py --calibrate ก่อน ถ้ายังไม่เคย)
   python maze_shooter.py          # ต่อหุ่นจริง
   python maze_shooter.py --sim    # จำลองบนคอม ไม่ต่อหุ่น (สนาม 4x4 ตัวอย่าง)
+  python maze_shooter.py --load   # โหลด maze_map.json: รอบ 1 จบแล้ว = ยิงรอบ 2 ได้เลย, ยังไม่จบ = กด e สำรวจต่อ
 
 ปุ่ม (คลิกในหน้าต่าง หรือกดคีย์ในวงเล็บ)
   e  สำรวจ (รอบ 1)          ENTER  ยิง (รอบ 2)         d  ซ้อมรอบ 2 ไม่ยิง
   1  จุดเริ่มรอบ 2           2  จบรอบ 2 ที่ไหน           3  ลำดับยิง (ทางสั้นสุด / ตามสี)
   r/g/b/y  เรียงลำดับสี     u  ลบสีตัวท้าย             คลิกช่องบนแผนที่ = ตั้ง GOAL
   x / SPACE  หยุดทันที      c  หันหัวกลับตรง           q / ESC  ออก
+  h  บอกโปรแกรมว่าหุ่นถูกวางที่ start แล้ว (ใช้หลังกด STOP กลางทาง ตำแหน่งในแผนที่ไม่แน่นอน)
 """
 import argparse
 import heapq
 import itertools
 import json
 import math
+import os
 import threading
 import time
 import traceback
@@ -61,6 +65,9 @@ KP_YAW, KD_YAW = 1.4, 0.08      # คุมหัวรถให้ตรงด�
 BUMPER_MM = 150                 # ToF ใกล้กว่านี้ระหว่างเดิน = เบรกฉุกเฉิน
 MIN_TRAVEL_FRACTION = 0.8       # เบรกก่อนเดินได้เท่านี้ = ไม่นับว่าถึงช่องถัดไป (ตำแหน่งในแผนที่ไม่เพี้ยน)
 MOVE_TIMEOUT_S = 6.0
+TURN_TOL_DEG = 10.0             # เลี้ยวแล้ว IMU ต้องห่างจากทิศที่ต้องการไม่เกินนี้ ไม่งั้นถือว่าเลี้ยวพลาด
+BUMPER_SAMPLES = 3              # ToF ต้องอ่านใกล้ติดกันกี่ค่า (20 Hz) ถึงเบรก ค่าหลุดค่าเดียวไม่นับ
+SENSOR_STALE_S = 0.6            # ToF ไม่มีค่าใหม่นานเกินนี้ระหว่างเดิน = stream ค้าง ต้องหยุดรถ
 
 # --- ตรวจกำแพงด้วย ToF บนหัว ---
 WALL_TOF_MM = 400               # ToF ใกล้กว่านี้ = มีกำแพง/บล็อกกั้นระหว่างช่อง (ผนังขอบช่องห่าง ~250 มม.)
@@ -100,6 +107,10 @@ WINDOW = "RoboMaster Maze Shooter"
 
 class Aborted(Exception):
     """ ผู้ใช้กด STOP / QUIT ระหว่างที่หุ่นทำงาน """
+
+
+class HardwareFault(Exception):
+    """ เซ็นเซอร์หรือการเคลื่อนที่ผิดปกติจนทำต่อไม่ปลอดภัย (คนละอย่างกับผู้ใช้กดหยุด) """
 
 
 # ==========================================
@@ -241,8 +252,11 @@ class RealRobot:
 
     def __init__(self):
         self.tof_mm = 0
+        self.tof_seq = 0                         # นับค่า ToF ที่เข้ามา (กันชนใช้แยกค่าใหม่กับค่าเดิม)
+        self.tof_t = 0.0                         # เวลาที่ได้ค่า ToF ล่าสุด (เช็ค stream ค้าง)
         self._tof_log: deque = deque(maxlen=60)  # (เวลา, มม.)
         self.yaw = 0.0
+        self.att_count = 0
         self.ep = robot.Robot()
         print("[INFO] Connecting to RoboMaster (AP)...")
         if not self.ep.initialize(conn_type=gs.CONN_TYPE):
@@ -254,18 +268,35 @@ class RealRobot:
         self.leds = gs.LedManager(self.ep.led, self.blaster)  # ไฟ Top/Blaster ดับตลอด (จาก gimbalshoot)
         self.leds.silence_gimbal_lights()
         self.leds.show_status("white", False, False)
-        self.ep.sensor.sub_distance(freq=20, callback=self._on_tof)
-        self.chassis.sub_attitude(freq=20, callback=self._on_attitude)
+        tof_ok = self.ep.sensor.sub_distance(freq=20, callback=self._on_tof)
+        imu_ok = self.chassis.sub_attitude(freq=20, callback=self._on_attitude)
         self.camera.start_video_stream(display=False, resolution=gs.STREAM_RESOLUTION)
         self.gimbal_to(0, 0)
         time.sleep(1.0)  # รอค่า ToF/IMU ชุดแรก
+        self._check_sensors(tof_ok, imu_ok)
+
+    def _check_sensors(self, tof_ok, imu_ok):
+        """ ก่อนเริ่มงาน: ToF ต้องมีค่าจริง (ไม่ใช่ 0 ตลอด = เสียบผิดช่อง/สายหลุด) และ IMU ต้องส่งค่ามา
+        ไม่งั้นกันชนไม่ทำงาน แผนที่เปิดโล่งหมด หรือรถหมุนวน โดยไม่มีอะไรเตือน """
+        problems = []
+        if tof_ok is False or not any(v >= TOF_MIN_VALID_MM for _, v in list(self._tof_log)):
+            problems.append(f"ToF gives no valid reading (last {self.tof_mm} mm): check the cable and port")
+        if imu_ok is False or self.att_count == 0:
+            problems.append("chassis IMU attitude sends no data")
+        if problems:
+            self.close()
+            raise ConnectionError("; ".join(problems))
 
     def _on_tof(self, info):
+        now = time.monotonic()
         self.tof_mm = info[0]
-        self._tof_log.append((time.monotonic(), info[0]))
+        self.tof_t = now
+        self.tof_seq += 1
+        self._tof_log.append((now, info[0]))
 
     def _on_attitude(self, info):
         self.yaw = info[0]
+        self.att_count += 1
 
     def read_tof_mm(self) -> Optional[float]:
         """ ค่ามัธยฐานของ ToF ช่วง TOF_SAMPLE_S ถัดจากนี้ (ตัดค่า 0/อ่านพลาดทิ้ง) """
@@ -301,17 +332,34 @@ class RealRobot:
             gs.safe_call("turn wait", action.wait_for_completed, timeout=MOVE_TIMEOUT_S)
         time.sleep(0.3)
 
+    def turn_by(self, deg: float):
+        """ หมุนตัวรถแก้มุมเล็กๆ (+ = ตามเข็ม/ขวา แบบเดียวกับ IMU) """
+        action = gs.safe_call("chassis correct", self.chassis.move, x=0, y=0, z=-deg, z_speed=TURN_SPEED)
+        if action is not None:
+            gs.safe_call("correct wait", action.wait_for_completed, timeout=MOVE_TIMEOUT_S)
+        time.sleep(0.3)
+
     def forward_one_cell(self, target_yaw: float, check) -> float:
-        """ เดินหน้า 1 ช่อง: IMU คุมหัวรถตรง + ToF กันชน คืนสัดส่วนระยะที่เดินได้ (1.0 = ครบช่อง) """
+        """ เดินหน้า 1 ช่อง: IMU คุมหัวรถตรง + ToF กันชน คืนสัดส่วนระยะที่เดินได้ (1.0 = ครบช่อง)
+        กันชนต้องเห็นใกล้ติดกัน BUMPER_SAMPLES ค่า (ค่าหลุดค่าเดียวไม่เบรก) และถ้า ToF ค้าง = หยุดรถทันที """
         duration = CELL_M / BASE_SPEED
         t0 = time.monotonic()
         last_err, elapsed = 0.0, 0.0
+        seen_seq, close_hits = self.tof_seq, 0
         try:
             while True:
                 check()
-                elapsed = time.monotonic() - t0
-                if elapsed >= duration or TOF_MIN_VALID_MM <= self.tof_mm <= BUMPER_MM:
+                now = time.monotonic()
+                elapsed = now - t0
+                if elapsed >= duration:
                     break
+                if now - self.tof_t > SENSOR_STALE_S:
+                    raise HardwareFault(f"ToF stream stalled ({now - self.tof_t:.1f} s without data) while driving")
+                if self.tof_seq != seen_seq:
+                    seen_seq = self.tof_seq
+                    close_hits = close_hits + 1 if TOF_MIN_VALID_MM <= self.tof_mm <= BUMPER_MM else 0
+                    if close_hits >= BUMPER_SAMPLES:
+                        break
                 err = normalize_angle(target_yaw - self.yaw)
                 z_speed = KP_YAW * err + KD_YAW * (err - last_err)
                 last_err = err
@@ -470,6 +518,9 @@ class SimRobot:
         self.yaw = YAW_TARGETS[self.heading]
         time.sleep(0.15)
 
+    def turn_by(self, deg: float):
+        self.yaw = normalize_angle(self.yaw + deg)
+
     def forward_one_cell(self, target_yaw: float, check) -> float:
         check()
         nxt = MazeMap.step(self.cell, self.heading)
@@ -534,6 +585,8 @@ class FrameGrabber(threading.Thread):
         t0 = time.monotonic()
         while self.seq <= after_seq and time.monotonic() - t0 < timeout:
             time.sleep(0.01)
+        if self.seq <= after_seq:
+            return None, after_seq  # กล้องไม่ส่งภาพใหม่: ห้ามเอาภาพเก่าที่ค้างไปตัดสิน
         return self.frame, self.seq
 
     def stop(self):
@@ -564,6 +617,9 @@ class MazeMission:
         self.route: List[Cell] = []
         self.results: Dict[Cell, str] = {}
         self.armed = False
+        self.pose_uncertain = False                # หยุดกลางการเคลื่อนที่: ตำแหน่งในแผนที่ไม่ตรงของจริงแล้ว
+        self.bumper_hits: Dict[Tuple[Cell, Cell], int] = {}
+        self._map_backed_up = False
         self.pid_yaw = gs.PIDController(**gs.YAW_PID)
         self.pid_pitch = gs.PIDController(**gs.PITCH_PID)
         self.fire_ctrl = gs.FireController()
@@ -588,6 +644,8 @@ class MazeMission:
                 fn(*args)
             except Aborted:
                 self.log("STOPPED by user")
+            except HardwareFault as e:
+                self.log(f"FAULT: {e}")
             except Exception as e:  # แสดงบนจอด้วย ไม่ให้ thread ตายเงียบ
                 traceback.print_exc()
                 self.log(f"ERROR: {e}")
@@ -606,28 +664,66 @@ class MazeMission:
         self.stop_event.set()
 
     # ---------- การเคลื่อนที่ ----------
+    def imu_heading(self) -> int:
+        """ ทิศ (0-3) ที่ IMU บอกว่าตัวรถหันอยู่จริง ปัดเข้าทิศที่ใกล้สุด """
+        return int(round(normalize_angle(self.io.yaw - self.yaw_offset) / 90.0)) % 4
+
     def face(self, d: int):
-        """ หมุนตัวรถไปทิศ d แล้วหันหัวตรงตัวรถ (ToF ด้านหน้าเป็นกันชนตอนเดิน) """
-        steps = (d - self.heading) % 4
-        if steps:
-            self.io.rotate(steps)
-            self.heading = d
-        self.io.gimbal_to(0, 0)
+        """ หมุนตัวรถไปทิศ d แล้วหันหัวตรงตัวรถ (ToF ด้านหน้าเป็นกันชนตอนเดิน)
+        เช็คกับ IMU ทุกครั้ง: คำสั่งเลี้ยวหลุดหรือหมุนไม่ถึง = ลองใหม่ 1 ครั้ง ยังไม่ได้ก็หยุด (แผนที่จะได้ไม่หมุนเพี้ยน) """
+        err = 0.0
+        for _ in range(2):
+            steps = (d - self.imu_heading()) % 4
+            if steps:
+                self.io.rotate(steps)
+            else:
+                err = normalize_angle(self.io.yaw - (self.yaw_offset + YAW_TARGETS[d]))
+                if abs(err) > TURN_TOL_DEG:
+                    self.io.turn_by(-err)
+            err = normalize_angle(self.io.yaw - (self.yaw_offset + YAW_TARGETS[d]))
+            if abs(err) <= TURN_TOL_DEG:
+                self.heading = d
+                self.io.gimbal_to(0, 0)
+                return
+            self.log(f"Turn to {DIR_NAMES[d]} missed: IMU {err:+.0f} deg off, retry")
+        self.heading = self.imu_heading()
+        raise HardwareFault(f"cannot turn to {DIR_NAMES[d]}: IMU still {err:+.0f} deg off")
 
     def drive_path(self, path: List[Cell], on_arrive=None) -> bool:
-        """ เดินตาม path ทีละช่อง ถ้ากันชนเบรกกลางทาง บันทึกเป็นกำแพงแล้วคืน False ให้วางเส้นทางใหม่ """
+        """ เดินตาม path ทีละช่อง คืน False เมื่อต้องวางเส้นทางใหม่
+        - ก่อนเข้าช่องที่ยังไม่เคยไป ก้มกล้องดูซ้ำ กันขับชนเป้าที่รอบแรกมองพลาด
+        - กันชนเบรกกลางทาง: ถอยกลับกลางช่องแล้ววัด ToF นิ่งๆ ซ้ำ ยืนยันแล้ว (หรือเบรกช่องเดิมซ้ำ) ถึงบันทึกเป็นกำแพง
+        """
         self.route = list(path)
         for nxt in path[1:]:
             self.check()
             d = DIRS.index((nxt[0] - self.cell[0], nxt[1] - self.cell[1]))
             self.face(d)
+            if nxt not in self.maze.visited:
+                color = self.look_for_target(0)
+                if color is not None:
+                    self.maze.targets[nxt] = color
+                    self.log(f"Target {color.upper()} at {nxt} (second look): not entering")
+                    self.save_map(quiet=True)
+                    return False
             self.status = f"Drive {self.cell} -> {nxt}"
-            fraction = self.io.forward_one_cell(self.yaw_offset + YAW_TARGETS[d], self.check)
+            try:
+                fraction = self.io.forward_one_cell(self.yaw_offset + YAW_TARGETS[d], self.check)
+            except (Aborted, HardwareFault):
+                self.pose_uncertain = True  # หยุดกลางทาง: รถไม่อยู่กลางช่องไหนแล้ว
+                raise
             if fraction < MIN_TRAVEL_FRACTION:
-                self.log(f"Bumper stop {self.cell}->{nxt}: wall, replan")
                 if fraction > 0.05:
                     self.io.move_straight(-fraction * CELL_M)  # กลับไปกลางช่องเดิม
-                self.maze.set_edge(self.cell, nxt, -1)
+                edge = MazeMap._key(self.cell, nxt)
+                self.bumper_hits[edge] = self.bumper_hits.get(edge, 0) + 1
+                tof = self.io.read_tof_mm()  # หัวยังหันทิศ d อยู่
+                if (tof is not None and tof < WALL_TOF_MM) or self.bumper_hits[edge] >= 2:
+                    self.log(f"Bumper stop {self.cell}->{nxt}: wall (ToF {tof} mm), replan")
+                    self.maze.set_edge(self.cell, nxt, -1)
+                    self.save_map(quiet=True)
+                else:
+                    self.log(f"Bumper stop {self.cell}->{nxt} but ToF now {tof:.0f} mm: false alarm, retry")
                 return False
             self.cell = nxt
             self.route = self.route[1:]
@@ -650,7 +746,10 @@ class MazeMission:
 
     # ---------- รอบ 1: สำรวจ ----------
     def explore(self):
-        self.log("ROUND 1: explore")
+        if self.pose_uncertain:
+            self.log("Position unknown: put robot at START, press h, then e")
+            return
+        self.log("ROUND 1: " + (f"resume ({len(self.maze.visited)} cells known)" if self.maze.visited else "explore"))
         self.io.set_status_led(False, True)
         self.maze.explored = False
         self.scan_cell()
@@ -679,11 +778,15 @@ class MazeMission:
             self.io.gimbal_to(0, rel)
             time.sleep(GIMBAL_SETTLE_S if not self.io.sim else 0.02)
             tof = self.io.read_tof_mm()
-            if tof is not None and tof < WALL_TOF_MM:
+            if tof is None:
+                tof = self.io.read_tof_mm()  # อ่านซ้ำอีกรอบ
+            if tof is None:
+                self.log(f"ToF no reading at {c} {DIR_NAMES[d]}: treat as wall")
                 self.maze.set_edge(c, nb, -1)
                 continue
-            if tof is None:
-                self.log(f"ToF no reading at {c} {DIR_NAMES[d]}: assume open")
+            if tof < WALL_TOF_MM:
+                self.maze.set_edge(c, nb, -1)
+                continue
             self.maze.set_edge(c, nb, 1)
             if nb not in self.maze.visited:
                 color = self.look_for_target(rel)
@@ -693,17 +796,23 @@ class MazeMission:
         if dirs:
             self.look_dir = None
             self.io.gimbal_to(0, 0)
+        self.save_map(quiet=True)  # เซฟทุกช่อง: ล่ม/กดหยุดกลางรอบ 1 ก็สำรวจต่อจากไฟล์ได้
 
     def look_for_target(self, rel_yaw: float) -> Optional[str]:
         self.io.gimbal_to(TARGET_SCAN_PITCH, rel_yaw)
         seq = self.grabber.seq
         time.sleep(GIMBAL_SETTLE_S if not self.io.sim else 0.02)
         votes: Counter = Counter()
-        for _ in range(TARGET_SCAN_FRAMES):
+        frames = misses = 0
+        while frames < TARGET_SCAN_FRAMES:
             self.check()
             frame, seq = self.grabber.wait_new(seq)
             if frame is None:
+                misses += 1
+                if misses >= 2:
+                    raise HardwareFault("camera stream stalled: no new frame while looking for targets")
                 continue
+            frames += 1
             fd = gs.prepare_frame(frame)
             found = gs.detect_all_colors(fd, self.color_ranges, self.blind_zones)
             self.overlay, self.overlay_w = found, fd.size[0]
@@ -748,6 +857,9 @@ class MazeMission:
         self.log(f"ROUND 2: {'FIRE' if fire else 'DRY RUN'} | {start_mode} | {order_mode} | end: {end_mode}")
         if start_mode == "PLACED AT START":
             self.reset_pose()
+        elif self.pose_uncertain:
+            self.log("Position unknown: put robot at START and use START: PLACED AT START (or press h)")
+            return
         elif start_mode == "DRIVE TO START" and self.cell != self.start_cell:
             self.log(f"Back to START {self.start_cell}")
             if not self.go_to(self.start_cell):
@@ -777,7 +889,8 @@ class MazeMission:
             else:
                 self.go_to(goal)
         shot = sum(r == "SHOT" for r in self.results.values())
-        self.log(f"ROUND 2 done: shot {shot}/{len(order)}")
+        missed = sum(r == "UNREACHABLE" for r in self.results.values())
+        self.log(f"ROUND 2 done: shot {shot}/{len(order)}" + (f", {missed} unreachable" if missed else ""))
         self.save_map()
 
     def best_spot(self, target: Cell) -> Optional[Tuple[Cell, int]]:
@@ -790,9 +903,8 @@ class MazeMission:
         """ SHORTEST: ลองทุกลำดับ (เป้าไม่เยอะ) เลือกลำดับที่เดินรวมน้อยสุด นับรวมทางไปจุดจบด้วย
         COLOR ORDER: ยิงตามลำดับสีที่เลือก (สีที่ไม่เลือกไม่ยิง) สีเดียวกันไปเป้าที่ใกล้กว่าก่อน
         """
-        targets = [t for t in self.maze.targets if self.maze.shooting_spots(t)]
-        if order_mode == "COLOR ORDER":
-            targets = [t for t in targets if self.maze.targets[t] in color_order]
+        wanted = [t for t in self.maze.targets
+                  if order_mode != "COLOR ORDER" or self.maze.targets[t] in color_order]
         cache: Dict[Cell, Dict[Cell, int]] = {}
 
         def dist(a: Cell, b: Cell) -> float:
@@ -813,6 +925,13 @@ class MazeMission:
                 pool.remove(t)
             return out, pos
 
+        # เป้าที่ไม่มีช่องยิงที่ไปถึงได้: ตัดออกก่อน ไม่งั้นทุกลำดับยาวอนันต์แล้วไม่ได้ยิงสักเป้า
+        targets = [t for t in wanted if reach(self.cell, t)[0] < math.inf]
+        for t in wanted:
+            if t not in targets:
+                self.results[t] = "UNREACHABLE"
+                self.log(f"Skip {self.maze.targets[t].upper()} {t}: no reachable shooting cell")
+
         if order_mode == "COLOR ORDER":
             order, pos = [], self.cell
             for color in color_order:
@@ -829,7 +948,7 @@ class MazeMission:
                 total += cost
                 if total >= best_cost:
                     break
-            if end_cell is not None:
+            if end_cell is not None and dist(pos, end_cell) < math.inf:
                 total += dist(pos, end_cell)
             if total < best_cost:
                 best_cost, best = total, list(perm)
@@ -849,55 +968,66 @@ class MazeMission:
         self.pid_yaw.reset()
         self.pid_pitch.reset()
         self.fire_ctrl.reset_lock()
-        result, shots, hold_since, last_deg = "SKIPPED", 0, None, None
+        result, shots, hold_since, last_deg, misses = "SKIPPED", 0, None, None, 0
         seq, t0 = self.grabber.seq, time.monotonic()
-        while time.monotonic() - t0 < AIM_TIMEOUT_S:
-            self.check()
-            frame, seq = self.grabber.wait_new(seq)
-            if frame is None:
-                continue
-            fd = gs.prepare_frame(frame)
-            w, h = fd.size
-            cands = gs.find_targets(fd, gs.build_mask(fd.hsv, self.color_ranges[color], self.blind_zones), color)
-            self.overlay, self.overlay_w = cands, w
-            ref = last_deg or (gs.AIM_OFFSET_X_DEG, gs.AIM_OFFSET_Y_DEG)
-            best, best_deg, best_dist = None, None, gs.MATCH_RADIUS_DEG
-            for cand in cands:
-                deg = gs.pixel_to_degrees(cand.cx, cand.cy, w, h)
-                d = math.hypot(deg[0] - ref[0], deg[1] - ref[1])
-                if d < best_dist:
-                    best, best_deg, best_dist = cand, deg, d
-            if best is None:
-                self.io.gimbal_speed(0, 0)
-                self.pid_yaw.reset()
-                self.pid_pitch.reset()
-                self.fire_ctrl.reset_lock()
-                last_deg, hold_since = None, None
-                self.status = f"Aim {color.upper()}: target not in view"
-                continue
-            last_deg = best_deg
-            ex, ey = best_deg[0] - gs.AIM_OFFSET_X_DEG, best_deg[1] - gs.AIM_OFFSET_Y_DEG
-            self.io.gimbal_speed(self.pid_pitch.compute(ey), self.pid_yaw.compute(ex))
-            state, should_fire = self.fire_ctrl.evaluate(ex, ey, False)
-            self.status = f"Aim {color.upper()}: {state}  err X {ex:+.2f} Y {ey:+.2f}"
-            if should_fire:
-                self.io.gimbal_speed(0, 0)
-                if self.io.fire():
-                    shots += 1
-                    self.log(f"FIRE at {color.upper()} {target}")
-                self.fire_ctrl.mark_fired()
-                if shots >= SHOTS_PER_TARGET:
-                    result = "SHOT"
-                    break
-            elif self.fire_ctrl.settled and not self.armed:
-                hold_since = hold_since or time.monotonic()
-                if time.monotonic() - hold_since >= DRY_HOLD_S:
-                    result = "AIMED"
-                    break
-            else:
-                hold_since = None
-        self.io.gimbal_speed(0, 0)
-        self.overlay = []
+        try:
+            while time.monotonic() - t0 < AIM_TIMEOUT_S:
+                self.check()
+                frame, seq = self.grabber.wait_new(seq)
+                if frame is None:
+                    self.io.gimbal_speed(0, 0)  # ไม่มีภาพใหม่ = ห้ามหมุนหัวต่อด้วยคำสั่งเก่า
+                    misses += 1
+                    if misses >= 2:
+                        raise HardwareFault("camera stream stalled while aiming")
+                    continue
+                misses = 0
+                fd = gs.prepare_frame(frame)
+                w, h = fd.size
+                cands = gs.find_targets(fd, gs.build_mask(fd.hsv, self.color_ranges[color], self.blind_zones), color)
+                self.overlay, self.overlay_w = cands, w
+                ref = last_deg or (gs.AIM_OFFSET_X_DEG, gs.AIM_OFFSET_Y_DEG)
+                best, best_deg, best_dist = None, None, gs.MATCH_RADIUS_DEG
+                for cand in cands:
+                    deg = gs.pixel_to_degrees(cand.cx, cand.cy, w, h)
+                    d = math.hypot(deg[0] - ref[0], deg[1] - ref[1])
+                    if d < best_dist:
+                        best, best_deg, best_dist = cand, deg, d
+                if best is None:
+                    self.io.gimbal_speed(0, 0)
+                    self.pid_yaw.reset()
+                    self.pid_pitch.reset()
+                    self.fire_ctrl.reset_lock()
+                    last_deg, hold_since = None, None
+                    self.status = f"Aim {color.upper()}: target not in view"
+                    continue
+                last_deg = best_deg
+                ex, ey = best_deg[0] - gs.AIM_OFFSET_X_DEG, best_deg[1] - gs.AIM_OFFSET_Y_DEG
+                self.io.gimbal_speed(self.pid_pitch.compute(ey), self.pid_yaw.compute(ex))
+                state, should_fire = self.fire_ctrl.evaluate(ex, ey, False)
+                self.status = f"Aim {color.upper()}: {state}  err X {ex:+.2f} Y {ey:+.2f}"
+                if should_fire:
+                    self.io.gimbal_speed(0, 0)
+                    if self.io.fire():
+                        shots += 1
+                        self.log(f"FIRE at {color.upper()} {target}")
+                    self.fire_ctrl.mark_fired()
+                    if shots >= SHOTS_PER_TARGET:
+                        result = "SHOT"
+                        break
+                elif self.fire_ctrl.settled and not self.armed:
+                    hold_since = hold_since or time.monotonic()
+                    if time.monotonic() - hold_since >= DRY_HOLD_S:
+                        result = "AIMED"
+                        break
+                else:
+                    hold_since = None
+        except (Aborted, HardwareFault):
+            if backoff > 0.01:
+                self.pose_uncertain = True  # หยุดตอนถอยรถเล็งอยู่: รถไม่อยู่กลางช่องแล้ว
+            raise
+        finally:
+            self.io.gimbal_speed(0, 0)
+            self.overlay = []
         if backoff > 0.01:
             self.io.move_straight(backoff)  # กลับกลางช่อง
         self.io.gimbal_to(0, 0)
@@ -917,17 +1047,26 @@ class MazeMission:
         self.cell, self.heading = self.start_cell, self.start_heading
         self.yaw_offset = self.io.yaw - YAW_TARGETS[self.start_heading]
         self.route = []
+        self.pose_uncertain = False
         self.log(f"Pose reset: at START {self.start_cell} facing {DIR_NAMES[self.start_heading]}")
 
-    def save_map(self):
+    def save_map(self, quiet: bool = False):
+        """ เขียนไฟล์ใหม่ให้เสร็จก่อนแล้วค่อยสลับ (ล่มกลางการเขียน ไฟล์เดิมไม่พัง)
+        ครั้งแรกของการรันนี้ สำรองไฟล์เดิมเป็น .bak ก่อน กันรอบ 1 ใหม่เขียนทับแผนที่ที่ได้มาแล้ว """
         data = self.maze.to_json()
         data.update({"start": list(self.start_cell), "start_heading": self.start_heading,
                      "robot": list(self.cell), "heading": self.heading,
                      "results": [{"cell": list(c), "result": r} for c, r in self.results.items()],
                      "saved_at": time.strftime("%Y-%m-%d %H:%M:%S")})
         try:
-            MAP_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
-            self.log(f"Map saved: {MAP_FILE.name}")
+            if not self._map_backed_up and MAP_FILE.exists():
+                os.replace(MAP_FILE, MAP_FILE.with_name(MAP_FILE.name + ".bak"))
+            self._map_backed_up = True
+            tmp = MAP_FILE.with_name(MAP_FILE.name + ".tmp")
+            tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            os.replace(tmp, MAP_FILE)
+            if not quiet:
+                self.log(f"Map saved: {MAP_FILE.name}")
         except OSError as e:
             self.log(f"Cannot save map: {e}")
 
@@ -974,7 +1113,7 @@ class App:
             return "shoot"
         if ch in gs.KEY_TO_COLOR:
             return "color:" + gs.KEY_TO_COLOR[ch]
-        return {"e": "explore", "d": "dry", "c": "center", "1": "opt_start", "2": "opt_end",
+        return {"e": "explore", "d": "dry", "c": "center", "h": "home", "1": "opt_start", "2": "opt_end",
                 "3": "opt_order", "u": "undo"}.get(ch)
 
     def do(self, action: str):
@@ -1019,6 +1158,8 @@ class App:
                         list(self.color_order), self.goal)
         elif action == "center":
             m.start_job("RECENTER", m.recenter)
+        elif action == "home":
+            m.start_job("AT START", m.reset_pose)
 
     # ---------- Loop หลัก ----------
     def run(self):
@@ -1137,12 +1278,17 @@ class App:
         gs.label(canvas, f"Robot {m.cell} facing {DIR_NAMES[m.heading]}   "
                          f"Map: {'EXPLORED' if m.maze.explored else 'not explored'}", px, 94, gs.UI_TEXT, 0.48)
         gs.label(canvas, fire_text, px + bw - 120, 94, fire_color, 0.5, 2)
-        gs.label(canvas, m.status, px, 118, gs.UI_DIM, 0.45, max_w=bw)
+        if m.pose_uncertain:
+            gs.label(canvas, "!! POSITION UNKNOWN: put robot at START, press h", px, 118, (80, 80, 255), 0.5, 2,
+                     max_w=bw)
+        else:
+            gs.label(canvas, m.status, px, 118, gs.UI_DIM, 0.45, max_w=bw)
 
         idle, explored = not m.busy, m.maze.explored
         gs.label(canvas, "ROUND 1", px, 146, gs.UI_DIM, 0.45)
-        self.ui.button(canvas, px, 154, half, 42, "EXPLORE MAP (e)", "explore", gs.UI_ORANGE, enabled=idle)
-        self.ui.button(canvas, px + half + 8, 154, half, 42, "RECENTER HEAD (c)", "center", enabled=idle)
+        self.ui.button(canvas, px, 154, third, 42, "EXPLORE MAP (e)", "explore", gs.UI_ORANGE, enabled=idle)
+        self.ui.button(canvas, px + third + 8, 154, third, 42, "AT START (h)", "home", enabled=idle)
+        self.ui.button(canvas, px + 2 * (third + 8), 154, third, 42, "RECENTER HEAD (c)", "center", enabled=idle)
 
         gs.label(canvas, "ROUND 2 OPTIONS (click to change)", px, 222, gs.UI_DIM, 0.45)
         self.ui.button(canvas, px, 230, third, 36, f"START: {START_MODES[self.start_mode]} (1)", "opt_start")
@@ -1197,9 +1343,6 @@ def main():
         except (OSError, ValueError) as e:
             print(f"อ่าน {MAP_FILE.name} ไม่ได้: {e}")
             return
-        if not saved.get("explored"):
-            print(f"{MAP_FILE.name} มาจากรอบ 1 ที่ยังสำรวจไม่จบ ใช้รอบ 2 ไม่ได้")
-            return
         if "start_heading" not in saved:
             print(f"{MAP_FILE.name} ไม่มีทิศเริ่มต้น (ไฟล์จากโปรแกรมเวอร์ชันเก่า) ต้องสำรวจรอบ 1 ใหม่")
             return
@@ -1215,7 +1358,10 @@ def main():
         found = ", ".join(f"{c.upper()}@{cell}" for cell, c in sorted(maze.targets.items())) or "ไม่มี"
         print(f" โหลด {MAP_FILE.name}: สนาม {width}x{height} เริ่มที่ {start} ทิศ {DIR_NAMES[heading]}")
         print(f" เป้าที่รอบ 1 เจอ: {found}")
-        print(" วางหุ่นที่จุดเริ่ม หันทิศเดิม แล้วกด ENTER ในหน้าต่างโปรแกรมเพื่อยิง")
+        if maze.explored:
+            print(" วางหุ่นที่จุดเริ่ม หันทิศเดิม แล้วกด ENTER ในหน้าต่างโปรแกรมเพื่อยิง")
+        else:
+            print(f" รอบ 1 ยังไม่จบ (สำรวจแล้ว {len(maze.visited)} ช่อง): วางหุ่นที่จุดเริ่ม หันทิศเดิม แล้วกด e สำรวจต่อ")
     elif args.sim:
         print(" [SIM] ใช้สนามตัวอย่าง 4x4")
         width = height = 4
@@ -1227,7 +1373,11 @@ def main():
         heading = ask_int("หุ่นหันหน้าไปทิศ (0-3)", 0, 0, 3)
         maze = MazeMap(width, height)
 
-    io = SimRobot(start, heading, width, height) if args.sim else RealRobot()
+    try:
+        io = SimRobot(start, heading, width, height) if args.sim else RealRobot()
+    except ConnectionError as e:
+        print(f"[ERROR] {e}")
+        return
     grabber = FrameGrabber(io)
     grabber.start()
     mission = MazeMission(io, grabber, maze, start, heading)
