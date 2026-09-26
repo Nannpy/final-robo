@@ -1,2 +1,8 @@
 __pycache__/
 *.pyc
+
+# run output: sensor test logs, measured sensor map, saved maze map
+logs/
+sensor_map.json
+maze_map.json
+maze_map.json.bak

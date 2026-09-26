@@ -88,7 +88,8 @@ SHOTS_PER_TARGET = 1
 DRY_HOLD_S = 0.8                # ซ้อมรอบ 2: ค้างเล็งให้ดูกี่วินาที
 
 # --- ตัวเลือกรอบ 2 ---
-START_MODES = ("FROM START", "FROM HERE")
+# PLACED AT START = ยกหุ่นไปวางที่จุดเริ่มเอง (ตามกติกา) / DRIVE TO START = ให้หุ่นขับกลับเอง
+START_MODES = ("PLACED AT START", "DRIVE TO START", "FROM HERE")
 END_MODES = ("STOP", "BACK TO START", "GO TO GOAL")
 ORDER_MODES = ("SHORTEST", "COLOR ORDER")
 MAX_PERMUTE_TARGETS = 7         # เป้าไม่เกินนี้ = ลองทุกลำดับหาทางสั้นสุดจริง, มากกว่านี้ = เลือกใกล้สุดก่อน
@@ -209,6 +210,18 @@ class MazeMap:
             "open": [[list(a), list(b)] for (a, b), s in sorted(self.edges.items()) if s == 1],
             "targets": [{"cell": list(c), "color": col} for c, col in sorted(self.targets.items())],
         }
+
+    @classmethod
+    def from_json(cls, data: dict) -> "MazeMap":
+        """ สร้างแผนที่กลับจากไฟล์ที่รอบ 1 บันทึกไว้ (ใช้ตอนรันรอบ 2 เป็นโปรแกรมใหม่) """
+        maze = cls(int(data["width"]), int(data["height"]))
+        for status, key in ((-1, "walls"), (1, "open")):
+            for a, b in data.get(key, []):
+                maze.set_edge((a[0], a[1]), (b[0], b[1]), status)
+        maze.visited = {(c[0], c[1]) for c in data.get("visited", [])}
+        maze.targets = {(t["cell"][0], t["cell"][1]): t["color"] for t in data.get("targets", [])}
+        maze.explored = bool(data.get("explored", False))
+        return maze
 
 
 def normalize_angle(angle: float) -> float:
@@ -534,6 +547,7 @@ class MazeMission:
     def __init__(self, io, grabber: FrameGrabber, maze: MazeMap, start: Cell, heading: int):
         self.io, self.grabber, self.maze = io, grabber, maze
         self.start_cell = start
+        self.start_heading = heading
         self.cell, self.heading = start, heading
         self.yaw_offset = io.yaw - YAW_TARGETS[heading]  # มุม IMU ตอนเริ่ม = ทิศเริ่มต้น
         self.color_ranges, zones, _, _ = gs.load_config(gs.CONFIG_PATH)
@@ -732,7 +746,9 @@ class MazeMission:
         self.io.set_status_led(fire, False)
         self.results = {}
         self.log(f"ROUND 2: {'FIRE' if fire else 'DRY RUN'} | {start_mode} | {order_mode} | end: {end_mode}")
-        if start_mode == "FROM START" and self.cell != self.start_cell:
+        if start_mode == "PLACED AT START":
+            self.reset_pose()
+        elif start_mode == "DRIVE TO START" and self.cell != self.start_cell:
             self.log(f"Back to START {self.start_cell}")
             if not self.go_to(self.start_cell):
                 return
@@ -890,9 +906,23 @@ class MazeMission:
     def recenter(self):
         self.io.gimbal_to(0, 0)
 
+    def reset_pose(self):
+        """ รอบ 2 แบบยกหุ่นไปวางที่จุดเริ่มเอง: บอกโปรแกรมว่าตอนนี้อยู่ช่อง start หันทิศเริ่มต้น
+        ไม่ขับรถ แค่ผูกมุม IMU ปัจจุบันเข้ากับทิศเริ่มต้นใหม่ (ยกหุ่นแล้ว IMU มักเพี้ยน) """
+        self.io.gimbal_to(0, 0)
+        time.sleep(0.3)
+        if self.io.sim:  # สนามจำลอง: ย้ายหุ่นจำลองตามไปด้วย ไม่งั้นแผนที่กับโลกจำลองหลุดกัน
+            self.io.cell, self.io.heading = self.start_cell, self.start_heading
+            self.io.yaw, self.io.backoff = YAW_TARGETS[self.start_heading], 0.0
+        self.cell, self.heading = self.start_cell, self.start_heading
+        self.yaw_offset = self.io.yaw - YAW_TARGETS[self.start_heading]
+        self.route = []
+        self.log(f"Pose reset: at START {self.start_cell} facing {DIR_NAMES[self.start_heading]}")
+
     def save_map(self):
         data = self.maze.to_json()
-        data.update({"start": list(self.start_cell), "robot": list(self.cell), "heading": self.heading,
+        data.update({"start": list(self.start_cell), "start_heading": self.start_heading,
+                     "robot": list(self.cell), "heading": self.heading,
                      "results": [{"cell": list(c), "result": r} for c, r in self.results.items()],
                      "saved_at": time.strftime("%Y-%m-%d %H:%M:%S")})
         try:
@@ -1156,24 +1186,51 @@ def ask_int(prompt: str, default: int, low: int, high: int) -> int:
 def main():
     parser = argparse.ArgumentParser(description="RoboMaster EP: explore a maze (round 1), then shoot targets (round 2)")
     parser.add_argument("--sim", action="store_true", help="จำลองบนคอม ไม่ต่อหุ่น (สนาม 4x4 ตัวอย่าง)")
+    parser.add_argument("--load", action="store_true",
+                        help=f"โหลดแผนที่รอบ 1 จาก {MAP_FILE.name} แล้วเริ่มรอบ 2 ได้เลย (ยกหุ่นมาวางที่จุดเริ่มก่อน)")
     args = parser.parse_args()
+
+    saved = None
+    if args.load:
+        try:
+            saved = json.loads(MAP_FILE.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            print(f"อ่าน {MAP_FILE.name} ไม่ได้: {e}")
+            return
+        if not saved.get("explored"):
+            print(f"{MAP_FILE.name} มาจากรอบ 1 ที่ยังสำรวจไม่จบ ใช้รอบ 2 ไม่ได้")
+            return
+        if "start_heading" not in saved:
+            print(f"{MAP_FILE.name} ไม่มีทิศเริ่มต้น (ไฟล์จากโปรแกรมเวอร์ชันเก่า) ต้องสำรวจรอบ 1 ใหม่")
+            return
 
     print("=" * 56)
     print(" ตั้งค่าสนาม (ช่องละ 60 ซม.)  ทิศ: 0=N(^) 1=E(>) 2=S(v) 3=W(<)")
     print("=" * 56)
-    if args.sim:
+    if saved is not None:
+        maze = MazeMap.from_json(saved)
+        width, height = maze.w, maze.h
+        start = (saved["start"][0], saved["start"][1])
+        heading = int(saved["start_heading"])
+        found = ", ".join(f"{c.upper()}@{cell}" for cell, c in sorted(maze.targets.items())) or "ไม่มี"
+        print(f" โหลด {MAP_FILE.name}: สนาม {width}x{height} เริ่มที่ {start} ทิศ {DIR_NAMES[heading]}")
+        print(f" เป้าที่รอบ 1 เจอ: {found}")
+        print(" วางหุ่นที่จุดเริ่ม หันทิศเดิม แล้วกด ENTER ในหน้าต่างโปรแกรมเพื่อยิง")
+    elif args.sim:
         print(" [SIM] ใช้สนามตัวอย่าง 4x4")
         width = height = 4
     else:
         width = ask_int("ความกว้างสนาม (จำนวนช่องแกน X)", 4, 1, 12)
         height = ask_int("ความยาวสนาม (จำนวนช่องแกน Y)", 4, 1, 12)
-    start = (ask_int("จุดเริ่ม X", 0, 0, width - 1), ask_int("จุดเริ่ม Y", 0, 0, height - 1))
-    heading = ask_int("หุ่นหันหน้าไปทิศ (0-3)", 0, 0, 3)
+    if saved is None:
+        start = (ask_int("จุดเริ่ม X", 0, 0, width - 1), ask_int("จุดเริ่ม Y", 0, 0, height - 1))
+        heading = ask_int("หุ่นหันหน้าไปทิศ (0-3)", 0, 0, 3)
+        maze = MazeMap(width, height)
 
     io = SimRobot(start, heading, width, height) if args.sim else RealRobot()
     grabber = FrameGrabber(io)
     grabber.start()
-    mission = MazeMission(io, grabber, MazeMap(width, height), start, heading)
+    mission = MazeMission(io, grabber, maze, start, heading)
     try:
         App(mission, grabber).run()
     except KeyboardInterrupt:
