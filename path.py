@@ -1,3 +1,5 @@
+# ใข้ 2 algorithm เดิน BFS A*
+
 import sys
 import time
 import heapq

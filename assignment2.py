@@ -1,3 +1,5 @@
+# เดินในเเผนที่สุ่มได้
+
 import os
 import sys
 import time

@@ -1,33 +1,32 @@
-# ยิงสีเเบบหยุดหนิ่ง
-
 """
-RoboMaster EP - ตรวจจับป้ายสี แล้วยิงทุกเป้าต่อเนื่องตามลำดับสีที่เลือก
+RoboMaster EP - กวาดหาเป้าหลายสี/หลายรูปทรง แล้วสไลด์ตัวรถไปยิงเฉพาะเป้าที่อาจารย์สั่ง
 
-รวมของสองคน: ลอจิกจับป้ายสีและค่าการเล็ง/ล็อกเป้าจากโค้ดเพื่อน (grimball_shoot_3targets: vision.py, control.py)
-+ โปรแกรม GUI หน้าต่างเดียว, calibrate, เลือกลำดับยิง และภารกิจกวาดหาเป้าจากไฟล์นี้
+อัปเกรดจาก gimbalshoot.py (ไฟล์เดิมไม่ถูกแก้):
+  + แยกรูปทรงเป้า: วงกลม (CIR) / จัตุรัส (SQR) / สี่เหลี่ยมด้านขนาน-ผืนผ้า (PAR)
+  + กวาดหัวรอบเดียวแล้วให้ "เบอร์เป้า" 1..N เรียงจากซ้ายไปขวา พร้อมบอกสีและรูปทรงของแต่ละเบอร์
+  + เลือกเบอร์ที่ต้องยิง (เช่น 3 4 6 8 9) แล้วหุ่นสไลด์ตัวรถไปให้ตรงเป้าทีละอัน แล้วยิง
+  สนามโล่งไม่มีสิ่งกีดขวาง เป้าอยู่ห่างราว 1 เมตร หุ่นสไลด์ซ้าย-ขวาอย่างเดียว ไม่เดินหน้า-ถอยหลัง
 
 วิธีรัน
-  python gimbalshoot.py --calibrate : วาดพื้นที่ตาบอด + จูนสีครบทุกสี แล้วบันทึก (ทำครั้งแรก หรือเมื่อแสงเปลี่ยน)
-  python gimbalshoot.py             : ใช้ค่าที่ calibrate ไว้ เข้าหน้า READY เลือกลำดับแล้วยิงได้ทันที
-  (รันครั้งแรกที่ยังไม่มีไฟล์ config จะเข้าโหมด calibrate ให้อัตโนมัติ)
+  python gimbalshootandrun.py --calibrate : วาดพื้นที่ตาบอด + จูนสีครบทุกสี แล้วบันทึก (ทำครั้งแรก)
+  python gimbalshootandrun.py             : ใช้ค่าที่ calibrate ไว้ เข้าหน้า READY ได้เลย
 
-ทุกอย่างอยู่ในหน้าต่างเดียว (1280x720): ภาพกล้องซ้ายบน, แผงปุ่มด้านขวา, แถบล่างเป็น slider จูนสี/ผลภารกิจ
-คลิกปุ่มด้วยเมาส์ หรือใช้ปุ่มลัดคีย์บอร์ดที่เขียนในวงเล็บบนปุ่มก็ได้ (ต้องคลิกเลือกหน้าต่างก่อน)
+ลำดับใช้งาน
+  1. กด SCAN TARGETS (s) : หัวกวาดหาเป้าทุกสีทุกรูปทรง แล้วขึ้นรายการเป็นเบอร์ 1..N จากซ้ายไปขวา
+  2. เลือกเป้าที่อาจารย์สั่ง : กดเลข 1-9 หรือคลิกปุ่มเบอร์ (ลำดับที่กด = ลำดับที่จะไปยิง)
+  3. กด GO AND SHOOT (ENTER) : หุ่นสไลด์ไปให้เป้าอยู่ตรงหน้า -> เล็งละเอียด -> ยิง -> เป้าถัดไป
+     ยิงครบแล้วสไลด์กลับจุดเริ่ม (ปิดได้ที่ RETURN_TO_START)
 
-หน้าจอ
-  SETUP   (calibrate 1/2): ลากเมาส์บนภาพกล้อง = วาดกรอบพื้นที่ตาบอด       [u] ลบกรอบล่าสุด [x] ล้าง [ENTER] ถัดไป
-  TUNE    (calibrate 2/2): เลือกสี แล้วลาก slider H/S/V จนภาพ MASK เห็นแต่เป้า
-                           [r/g/b/y] เลือกสี [v] ตรวจรวมทุกสี [n/ENTER] ถัดไป [p] ย้อน [t] บันทึก
-                           [i/k/j/l] หันหัว ขึ้น/ลง/ซ้าย/ขวา [c] หันกลับตรง
-  READY                  : [r/g/b/y] เรียงลำดับสีที่จะยิง (คลิกสีแรก = เริ่มลำดับใหม่, คลิกซ้ำ = เอาออก)
-                           [u/Backspace] ลบตัวท้าย [x] ล้าง [ENTER] เริ่มยิง [d] ซ้อมเล็งไม่ยิง
-                           [t] จูนสี [c] หันกลับตรง  ปุ่ม CALIBRATE ALL = วาดพื้นที่ตาบอด + จูนใหม่ทั้งหมด
-  MISSION                : กวาดหัวหาเป้ารอบตัว แล้วยิงทุกเป้าต่อกันตามลำดับสี (สีเดียวกันยิงซ้ายไปขวา)
-                           [x/SPACE] หยุดทันที [s] เปิด/ปิดระบบยิง [c] หยุดแล้วหันกลับตรง
-  ทุกหน้า                 : [q/ESC] ออกจากโปรแกรมอย่างปลอดภัย
+ปุ่มในหน้า READY (ต้องคลิกเลือกหน้าต่างภาพก่อน)
+  s       : กวาดหาเป้าใหม่             1-9 : เลือก/ยกเลิกเป้าเบอร์นั้น
+  a       : เลือกทุกเป้า                0   : ล้างที่เลือก           u : ลบตัวท้าย
+  ENTER   : ไปยิงจริง                   d   : ซ้อม (เคลื่อนที่แต่ไม่ยิง)
+  t       : จูนสี (r/g/b/y สลับสีที่จูน)  c   : หันหัวกลับตรง        q / ESC : ออก
 
-ค่า HSV, พื้นที่ตาบอด และลำดับยิงล่าสุด บันทึกไว้ใน autoaim_config.json ข้างไฟล์นี้
-(หน้า SETUP/TUNE บันทึกเมื่อกด SAVE & FINISH เท่านั้น)
+ปุ่มระหว่างทำงาน
+  x / SPACE : หยุดทันที    s : เปิด/ปิดระบบยิง    c : หยุดแล้วหันหัวกลับตรง
+
+ค่า HSV และพื้นที่ตาบอด ใช้ไฟล์ autoaim_config.json ร่วมกับ gimbalshoot.py
 """
 import argparse
 import json
@@ -75,11 +74,20 @@ AIM_OFFSET_Y_DEG = 0.0          # + = บน
 COLOR_ORDER = ("red", "green", "blue", "yellow")  # ลำดับการจูนสี และลำดับยิงเริ่มต้น (เปลี่ยนได้ในหน้า READY)
 PROCESS_W = 960                 # ประมวลผลที่ความกว้างนี้ (540p = 960 พอดี ไม่ต้องย่อ) ภาพใหญ่กว่านี้จะถูกย่อก่อน
 MIN_AREA_RATIO = 0.0004         # ป้ายเล็กสุด เทียบกับพื้นที่ภาพ
-MAX_AREA_RATIO = 0.025          # ป้ายใหญ่สุด กันจับผนัง/ของใหญ่สีเดียวกัน
-MAX_SIGN_W, MAX_SIGN_H = 0.18, 0.22  # ความกว้าง/สูงสูงสุดของป้าย เทียบกับภาพ
-SIGN_ASPECT = (0.55, 2.0)       # ช่วงสัดส่วน กว้าง/สูง ของป้าย
-MIN_EXTENT = 0.65               # พื้นที่คอนทัวร์ / พื้นที่กรอบ (สี่เหลี่ยม ~1.0, สามเหลี่ยม ~0.5 -> เป้าสามเหลี่ยมใช้ 0.45)
-MIN_FILL = 0.75                 # ข้างในกรอบ (ตัดขอบออก 1/5) ต้องเป็นสีนั้นอย่างน้อยเท่านี้ (สามเหลี่ยมใช้ ~0.5)
+MAX_AREA_RATIO = 0.06           # ป้ายใหญ่สุด (เป้าอยู่ห่างแค่ ~1 ม. จึงเห็นใหญ่กว่างานเดิม)
+MAX_SIGN_W, MAX_SIGN_H = 0.30, 0.30  # ความกว้าง/สูงสูงสุดของป้าย เทียบกับภาพ
+SIGN_ASPECT = (0.40, 3.0)       # ช่วงสัดส่วน กว้าง/สูง (สี่เหลี่ยมด้านขนานเอียงทำให้กรอบกว้างขึ้น)
+MIN_EXTENT = 0.55               # พื้นที่คอนทัวร์ / พื้นที่กรอบ (จัตุรัส ~1.0, วงกลม ~0.79, ด้านขนานเอียง ~0.6)
+MIN_FILL = 0.65                 # ข้างในกรอบ (ตัดขอบออก 1/5) ต้องเป็นสีนั้นอย่างน้อยเท่านี้
+
+# --- แยกรูปทรงเป้า: วงกลม / จัตุรัส / สี่เหลี่ยมด้านขนาน ---
+SHAPES = ("circle", "square", "para")
+SHAPE_SHORT = {"circle": "CIR", "square": "SQR", "para": "PAR", "?": "?"}
+SHAPE_NAMES = {"circle": "CIRCLE", "square": "SQUARE", "para": "PARALLELOGRAM", "?": "UNKNOWN"}
+SHAPE_EPSILON_RATIO = 0.03      # ค่า epsilon ของ approxPolyDP ตอนนับมุม (ละเอียดกว่าตอนกรองป้าย)
+CIRCLE_MIN_CIRCULARITY = 0.82   # 4*pi*area/perimeter^2 : วงกลม ~1.0, จัตุรัส ~0.79
+SQUARE_SIDE_RATIO = 1.30        # ด้านยาวสุด/สั้นสุด ไม่เกินนี้ + มุมใกล้ 90 = จัตุรัส
+SQUARE_ANGLE_TOL = 15.0         # มุมในรูปต่างจาก 90 องศาได้ไม่เกินนี้ถึงนับว่าเป็นมุมฉาก
 BORDER_PX = 3                   # ป้ายที่ชิดขอบภาพ (เห็นไม่เต็มแผ่น) ไม่นับ
 DEDUP_RATIO = 0.012             # จุดกลางห่างกันน้อยกว่านี้ (สัดส่วนภาพ) = ป้ายเดียวกัน
 MAX_CANDIDATES = 12             # เก็บป้ายต่อสีได้สูงสุดกี่อัน (เรียงจากใหญ่ไปเล็ก)
@@ -138,6 +146,21 @@ LOST_REPOINT_S = 1.0            # เป้าหายจากภาพนา�
 ENGAGE_TIMEOUT_S = 10.0         # ใช้เวลากับเป้าเดียวนานเกินนี้ -> ข้ามเป้านั้น
 SHOTS_PER_TARGET = 1
 DRY_RUN_HOLD_S = 0.5            # Auto-Fire ปิด: ค้างเล็งให้ดูกี่วินาทีก่อนไปเป้าถัดไป
+ALIGN_MATCH_RADIUS_DEG = 20.0   # ตอนสไลด์หาเป้า ยอมให้เป้าอยู่ห่างจากกลางภาพได้มากกว่าตอนเล็ง
+SHAPE_MISMATCH_PENALTY_DEG = 8.0  # ถ้ารูปทรงไม่ตรงกับที่เลือกไว้ ให้ถือว่า "ไกลกว่า" เท่านี้
+
+# --- สไลด์ตัวรถไปยิง (สนามโล่ง เป้าอยู่ห่าง ~1 ม. หุ่นสไลด์ข้างอย่างเดียว ไม่เดินหน้า) ---
+TARGET_DISTANCE_M = 1.0         # ระยะจากหุ่นถึงแนวเป้า ใช้แปลงมุมเป็นระยะสไลด์
+STRAFE_MOVE_SPEED = 0.5         # m/s ตอนสไลด์ก้อนใหญ่ (chassis.move)
+STRAFE_SPEED = 0.25             # m/s ตอนสไลด์ละเอียดให้ตรงเป้า
+STRAFE_KP = 0.9                 # ตัวคูณ P ของการสไลด์ละเอียด
+STRAFE_TOL_DEG = 1.0            # เป้าเบี่ยงจากแนวกลางลำตัวไม่เกินนี้ = ตรงเป้าแล้ว
+STRAFE_MAX_M = 1.5              # สไลด์ห่างจากจุดเริ่มได้ไกลสุดเท่านี้ (กันวิ่งหลุดสนาม)
+STRAFE_TIMEOUT_S = 12.0
+RUN_TARGET_TIMEOUT_S = 25.0     # ใช้เวลากับเป้าหนึ่งอัน (สไลด์ + เล็ง + ยิง) นานเกินนี้ -> ข้าม
+YAW_HOLD_KP = 1.4               # คุมหัวรถไม่ให้เบี้ยวระหว่างสไลด์ (ใช้ IMU)
+RETURN_TO_START = True          # ยิงครบแล้วสไลด์กลับจุดเริ่ม
+SHAPE_CHECK = True              # ก่อนยิง เตือนถ้ารูปทรงที่เห็นไม่ตรงกับที่เลือก
 
 # --- LED ---
 TOP_LED_REFRESH_S = 3.0         # สั่งดับไฟ Top ซ้ำทุกกี่วินาที เผื่อ firmware เปิดเอง (เช่นตอนโดนยิง)
@@ -152,7 +175,7 @@ NUDGE_KEYS = {"i": (NUDGE_DEG, 0), "k": (-NUDGE_DEG, 0), "j": (0, -NUDGE_DEG), "
 COLOR_SHORT = {"red": "RED", "green": "GRN", "blue": "BLU", "yellow": "YEL"}
 
 # --- GUI หน้าต่างเดียว ---
-WINDOW_NAME = "RoboMaster Auto-Aim"
+WINDOW_NAME = "RoboMaster Shoot and Run"
 VIEW_W, VIEW_H = 960, 540       # ภาพกล้องในหน้าต่าง (ย่อจาก 720p)
 PANEL_W = 320                   # แผงปุ่มด้านขวา
 STRIP_H = 180                   # แถบล่าง: slider จูนสี / คำแนะนำ / ผลภารกิจ
@@ -382,6 +405,11 @@ class Target:
     cy: float
     area: float
     bbox: Tuple[int, int, int, int]   # x, y, w, h
+    shape: str = "?"                  # circle / square / para
+
+    @property
+    def label(self) -> str:
+        return f"{COLOR_SHORT[self.color]} {SHAPE_SHORT[self.shape]}"
 
 
 @dataclass
@@ -389,7 +417,7 @@ class FrameData:
     """ ข้อมูลที่คำนวณครั้งเดียวต่อเฟรม แล้วใช้ร่วมกันทุกสี """
     bgr: np.ndarray                   # ภาพขนาดที่ประมวลผล (พิกัดเป้าทั้งหมดอ้างอิงภาพนี้)
     hsv: np.ndarray
-    edge_boxes: List[Tuple[float, Tuple[int, int, int, int]]]  # (พื้นที่, กรอบ) จากขอบภาพที่รูปร่างเป็นป้าย
+    edge_boxes: list  # (พื้นที่, กรอบ, คอนทัวร์) จากขอบภาพที่รูปร่างเป็นป้าย
 
     @property
     def size(self) -> Tuple[int, int]:
@@ -401,6 +429,7 @@ _MORPH_KERNEL = np.ones((3, 3), np.uint8)
 
 
 def _sign_box(contour, w: int, h: int) -> Optional[Tuple[float, Tuple[int, int, int, int]]]:
+    # (คืน (พื้นที่, กรอบ) ส่วนคอนทัวร์ผู้เรียกเก็บต่อเองเพื่อเอาไปแยกรูปทรง)
     """ เกณฑ์รูปร่างป้าย (ไม่ขึ้นกับสี) คืน (พื้นที่, กรอบ) หรือ None ถ้าไม่เหมือนป้าย """
     x, y, bw, bh = cv2.boundingRect(contour)
     frame_area = w * h
@@ -434,7 +463,7 @@ def prepare_frame(frame_bgr: np.ndarray) -> FrameData:
     for contour in cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)[-2]:
         box = _sign_box(contour, sw, sh)
         if box is not None:
-            edge_boxes.append(box)
+            edge_boxes.append(box + (contour,))
     return FrameData(small, hsv, edge_boxes)
 
 
@@ -444,6 +473,33 @@ def build_mask(hsv: np.ndarray, hsv_range: HSVRange, blind_zones: BlindZones) ->
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, _MORPH_KERNEL)  # อุดรูในป้าย
     blind_zones.apply(mask)  # ทำเป็นขั้นสุดท้าย พื้นที่ตาบอดจึงดำสนิทแน่นอน
     return mask
+
+
+def classify_shape(contour, area: float) -> str:
+    """ แยกรูปทรงเป้า: วงกลม / จัตุรัส / สี่เหลี่ยมด้านขนาน (รวมผืนผ้า)
+    ใช้ความกลม (4*pi*A/P^2) กับจำนวนมุมจาก approxPolyDP; ถ้าเป็นสี่เหลี่ยมค่อยดูด้านและมุมว่าเป็นจัตุรัสไหม
+    """
+    perimeter = cv2.arcLength(contour, True)
+    if perimeter <= 0:
+        return "?"
+    circularity = 4 * math.pi * area / (perimeter * perimeter)
+    approx = cv2.approxPolyDP(contour, SHAPE_EPSILON_RATIO * perimeter, True)
+    if len(approx) >= 5 and circularity >= CIRCLE_MIN_CIRCULARITY:
+        return "circle"
+    if len(approx) == 4:
+        pts = approx.reshape(4, 2).astype(np.float64)
+        sides = [float(np.linalg.norm(pts[(i + 1) % 4] - pts[i])) for i in range(4)]
+        if min(sides) <= 1e-6:
+            return "?"
+        angles = []
+        for i in range(4):
+            v1, v2 = pts[(i - 1) % 4] - pts[i], pts[(i + 1) % 4] - pts[i]
+            cosine = float(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2) + 1e-9))
+            angles.append(math.degrees(math.acos(min(max(cosine, -1.0), 1.0))))
+        square = (max(sides) / min(sides) <= SQUARE_SIDE_RATIO
+                  and all(abs(a - 90.0) <= SQUARE_ANGLE_TOL for a in angles))
+        return "square" if square else "para"
+    return "circle" if circularity >= CIRCLE_MIN_CIRCULARITY else "para"
 
 
 def find_targets(fd: FrameData, mask: np.ndarray, color: str) -> List[Target]:
@@ -456,11 +512,11 @@ def find_targets(fd: FrameData, mask: np.ndarray, color: str) -> List[Target]:
     for contour in cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]:
         box = _sign_box(contour, w, h)
         if box is not None:
-            boxes.append(box)
+            boxes.append(box + (contour,))
     boxes += fd.edge_boxes
 
     found: List[Target] = []
-    for area, (x, y, bw, bh) in boxes:
+    for area, (x, y, bw, bh), contour in boxes:
         inset = max(2, min(bw, bh) // 5)
         interior = mask[y + inset:y + bh - inset, x + inset:x + bw - inset]
         if interior.size == 0 or cv2.countNonZero(interior) / interior.size < MIN_FILL:
@@ -468,7 +524,7 @@ def find_targets(fd: FrameData, mask: np.ndarray, color: str) -> List[Target]:
         cx, cy = x + bw / 2.0, y + bh / 2.0
         if any(abs(cx - t.cx) < DEDUP_RATIO * w and abs(cy - t.cy) < DEDUP_RATIO * h for t in found):
             continue  # ป้ายเดียวกันที่เจอทั้งจาก mask และจากขอบภาพ
-        found.append(Target(color, cx, cy, area, (x, y, bw, bh)))
+        found.append(Target(color, cx, cy, area, (x, y, bw, bh), classify_shape(contour, area)))
     found.sort(key=lambda t: t.area, reverse=True)
     return found[:MAX_CANDIDATES]
 
@@ -487,7 +543,7 @@ def draw_targets(frame: np.ndarray, targets: List[Target], scale: float = 1.0):
         x, y, bw, bh = (int(round(v * scale)) for v in t.bbox)
         cv2.rectangle(frame, (x, y), (x + bw, y + bh), bgr, 2)
         cv2.circle(frame, (int(t.cx * scale), int(t.cy * scale)), 3, (255, 255, 255), -1)
-        put_text(frame, t.color.upper(), (x, max(14, y - 6)), bgr, 0.5, 1)
+        put_text(frame, t.label, (x, max(14, y - 6)), bgr, 0.5, 1)
 
 
 # ==========================================
@@ -819,62 +875,80 @@ class Ui:
 
 
 # ==========================================
-# 10. ภารกิจยิงทุกเป้าทุกสี
+# 10. ภารกิจ: กวาดหาเป้า แล้วสไลด์ตัวรถไปยิงเป้าที่เลือก
 # ==========================================
 @dataclass
-class PlannedTarget:
-    """ เป้าหนึ่งเป้า ตำแหน่งเป็นมุมเทียบกับหน้าหุ่น (yaw + = ขวา, pitch + = บน) """
+class ScanTarget:
+    """ เป้าหนึ่งอัน: สี + รูปทรง + มุมเทียบหน้าหุ่นตอนเริ่ม (yaw + = ขวา, pitch + = บน) """
     color: str
+    shape: str
     yaw: float
     pitch: float
     area: float
-    offset: float                                  # ระยะจากกึ่งกลางภาพตอนวัด (น้อย = แม่น ขอบเลนส์บิดเบี้ยว)
+    offset: float                                  # ระยะจากกึ่งกลางภาพตอนวัด (น้อย = แม่น)
     hits: int = 1
+    shape_votes: Dict[str, int] = field(default_factory=dict)
     poses: Set[int] = field(default_factory=set)   # มุมกวาดที่เห็นเป้านี้
+    index: int = 0                                 # เบอร์เป้า 1..N เรียงจากซ้ายไปขวา
     status: str = "PENDING"
     shots: int = 0
 
+    @property
+    def label(self) -> str:
+        return f"{COLOR_SHORT[self.color]} {SHAPE_SHORT[self.shape]}"
 
-def angular_distance(a: PlannedTarget, b: PlannedTarget) -> float:
+    @property
+    def lateral(self) -> float:
+        """ ตำแหน่งซ้าย-ขวาของเป้า (ม.) เทียบจุดที่หุ่นยืนกวาด: + = ขวา
+        เป้าเรียงอยู่บนแนวที่ห่างหุ่น TARGET_DISTANCE_M (ระยะตั้งฉาก) จึงใช้ tan ของมุม
+        """
+        yaw = max(-75.0, min(75.0, self.yaw))
+        return TARGET_DISTANCE_M * math.tan(math.radians(yaw))
+
+
+def angular_distance(a: ScanTarget, b: ScanTarget) -> float:
     return math.hypot(a.yaw - b.yaw, a.pitch - b.pitch)
 
 
 class TargetMap:
-    """ รวมผลการกวาดหาเป้าจากหลายมุมกล้อง ให้เป็นรายการเป้าที่ไม่ซ้ำกัน
-
-    - ในมุมกวาดเดียวกัน: หลายเฟรมที่เห็นจุดเดียวกัน (< POSE_MERGE_DEG) = เป้าเดียว
-    - ข้ามมุมกวาด: ค่ามุมเพี้ยนได้หลายองศาเพราะเลนส์มุมกว้าง จึงรวมในรัศมี CROSS_POSE_MERGE_DEG
-      แต่ถ้ามุมกวาดเดียวกันเห็นเป็น 2 ชิ้นแยกกัน ถือว่าเป็นคนละเป้าเสมอ
+    """ รวมผลการกวาดจากหลายมุมกล้องให้เป็นรายการเป้าที่ไม่ซ้ำ (แนวทางเดิมจาก gimbalshoot)
+    - มุมกวาดเดียวกัน: จุดที่ห่างกันน้อยกว่า POSE_MERGE_DEG = เป้าเดียวกัน
+    - ข้ามมุมกวาด: ค่ามุมเพี้ยนได้จากเลนส์ จึงเผื่อ CROSS_POSE_MERGE_DEG
+      แต่ถ้ามุมกวาดเดียวกันเห็นเป็นคนละชิ้น ต้องเป็นคนละเป้าเสมอ
+    รูปทรงใช้เสียงข้างมากจากทุกเฟรมที่เห็นเป้านั้น
     """
 
     def __init__(self):
-        self._current: List[PlannedTarget] = []
-        self._by_pose: List[List[PlannedTarget]] = []
+        self._current: List[ScanTarget] = []
+        self._by_pose: List[List[ScanTarget]] = []
 
-    def add_sighting(self, sighting: PlannedTarget):
+    def add_sighting(self, sighting: ScanTarget):
+        sighting.shape_votes = {sighting.shape: 1}
         for obs in self._current:
             if obs.color == sighting.color and angular_distance(obs, sighting) < POSE_MERGE_DEG:
                 obs.hits += 1
+                obs.shape_votes[sighting.shape] = obs.shape_votes.get(sighting.shape, 0) + 1
+                if sighting.offset < obs.offset:  # เก็บค่าที่วัดตอนเป้าอยู่ใกล้กลางภาพที่สุด
+                    obs.yaw, obs.pitch, obs.area, obs.offset = sighting.yaw, sighting.pitch, sighting.area, sighting.offset
                 return
         self._current.append(sighting)
 
     def end_pose(self) -> int:
-        """ ปิดมุมกวาดปัจจุบัน คืนจำนวนเป้าที่เจอในมุมนี้ """
         seen = [o for o in self._current if o.hits >= SCAN_MIN_HITS]
-        kept: List[PlannedTarget] = []
-        # วัตถุชิ้นเดียวอาจผ่านช่วงสีได้ 2 สี (เช่นส้มผ่านทั้งแดงและเหลือง) เก็บสีที่เห็นบ่อยกว่า
+        kept: List[ScanTarget] = []
         for obs in sorted(seen, key=lambda o: (o.hits, o.area), reverse=True):
+            # วัตถุชิ้นเดียวอาจผ่านช่วงสีได้ 2 สี เก็บสีที่เห็นบ่อยกว่า
             if all(angular_distance(obs, k) >= POSE_MERGE_DEG for k in kept):
+                obs.shape = max(obs.shape_votes.items(), key=lambda kv: kv[1])[0]
                 kept.append(obs)
         self._by_pose.append(kept)
         self._current = []
         return len(kept)
 
-    def build_plan(self, order: List[str]) -> List[PlannedTarget]:
-        """ order = สีที่จะยิงเรียงตามลำดับ สีที่ไม่อยู่ใน order จะไม่ถูกยิง """
+    def build_list(self) -> List[ScanTarget]:
         observations = sorted(((i, obs) for i, objs in enumerate(self._by_pose) for obs in objs),
-                              key=lambda item: item[1].offset)  # ค่าที่วัดใกล้กลางภาพที่สุดเป็นตัวแทน
-        clusters: List[PlannedTarget] = []
+                              key=lambda item: item[1].offset)
+        clusters: List[ScanTarget] = []
         for pose_idx, obs in observations:
             candidates = [c for c in clusters if c.color == obs.color and pose_idx not in c.poses
                           and angular_distance(c, obs) < CROSS_POSE_MERGE_DEG]
@@ -882,36 +956,38 @@ class TargetMap:
                 nearest = min(candidates, key=lambda c: angular_distance(c, obs))
                 nearest.poses.add(pose_idx)
                 nearest.hits += obs.hits
+                for shape, votes in obs.shape_votes.items():
+                    nearest.shape_votes[shape] = nearest.shape_votes.get(shape, 0) + votes
+                nearest.shape = max(nearest.shape_votes.items(), key=lambda kv: kv[1])[0]
             else:
                 obs.poses = {pose_idx}
                 clusters.append(obs)
-        # กวาดหาทุกสีแล้วค่อยกรอง: วัตถุที่ผ่าน 2 ช่วงสีถูกตัดสินเป็นสีที่เห็นบ่อยกว่าไปแล้วใน end_pose()
-        # ลำดับยิง: ตามลำดับสีที่เลือก แล้วซ้ายไปขวา (บนลงล่างถ้า yaw เท่ากัน)
-        chosen = [c for c in clusters if c.color in order]
-        return sorted(chosen, key=lambda c: (order.index(c.color), c.yaw, -c.pitch))
+        clusters.sort(key=lambda c: c.yaw)  # เรียงจากซ้ายไปขวา
+        for i, target in enumerate(clusters, 1):
+            target.index = i
+        return clusters
 
 
 class Mission:
-    """ ภารกิจยิงทุกเป้าตามลำดับสี แบบ non-blocking (เรียก step() ทุกเฟรม ภาพและปุ่มจึงไม่ค้าง)
+    """ ทำงานแบบ non-blocking (เรียก step() ทุกเฟรม ภาพและปุ่มจึงไม่ค้าง)
 
-    SCAN   : หมุนไปทีละมุมใน SCAN_PITCH_ANGLES x SCAN_YAW_ANGLES เก็บตำแหน่งเป้าทุกสี
-    ENGAGE : ยิงตามลำดับสีใน order: หมุนไปยังเป้า (moveto) -> เล็งละเอียดด้วยภาพ + PID -> ยิง -> เป้าถัดไป
-    DONE   : จบภารกิจ
-
-    ใช้ gimbal.moveto ซึ่งอ้างอิง yaw กับฐานล้อ และ pitch กับแนวระนาบ จึงเป็นพิกัดเดียวกับ recenter
+    โหมด SCAN : หันหัวกวาดตาม SCAN_YAW_ANGLES เก็บเป้าทุกสี/ทุกรูปทรง แล้วให้เบอร์ 1..N จากซ้ายไปขวา
+    โหมด RUN  : ไล่ตามเบอร์ที่เลือก -> สไลด์ตัวรถ (ไม่เดินหน้า) ให้เป้าอยู่ตรงหน้า -> เล็งละเอียด -> ยิง
     """
-    STATUS_SHORT = {"PENDING": "..", "ENGAGING": ">>", "FIRED": "SHOT", "AIMED-SAFE": "AIM", "SKIPPED": "SKIP"}
+    STATUS_SHORT = {"PENDING": "..", "GOING": ">>", "SHOT": "SHOT", "AIMED": "AIM", "SKIPPED": "SKIP"}
     MOVE_RETRY_S = 0.5
 
-    def __init__(self, app: "AutoAimApp", order: List[str]):
+    def __init__(self, app: "AutoAimApp", mode: str, fire: bool = False, order: Optional[List[int]] = None):
         self.app = app
-        self.order = list(order)
+        self.mode = mode                  # "SCAN" หรือ "RUN"
+        self.fire = fire
+        self.targets: List[ScanTarget] = list(app.targets) if mode == "RUN" else []
+        self.order = [i for i in (order or []) if any(t.index == i for t in self.targets)]
         self.poses = [(float(p), float(y)) for p in SCAN_PITCH_ANGLES for y in SCAN_YAW_ANGLES]
         self.target_map = TargetMap()
-        self.plan: List[PlannedTarget] = []
-        self.phase = "SCAN"
-        self.sub = "MOVE"  # MOVE -> SETTLE -> COLLECT (SCAN) หรือ AIM (ENGAGE)
-        self.index = 0     # มุมกวาดปัจจุบัน (SCAN) / เป้าปัจจุบัน (ENGAGE)
+        self.phase = "SCAN" if mode == "SCAN" else "RUN"
+        self.sub = "MOVE"
+        self.index = 0                    # มุมกวาดที่กำลังทำ (SCAN) / ลำดับในรายการที่เลือก (RUN)
         self.pose = (0.0, 0.0)
 
         # ผลของเฟรมล่าสุด ให้ App วาด HUD
@@ -928,13 +1004,28 @@ class Mission:
         self._last_match_deg: Optional[Tuple[float, float]] = None
         self._lost_since: Optional[float] = None
         self._hold_since: Optional[float] = None
-        self._move_to(*self.poses[0])
+        self._align_t0 = 0.0
+        self._strafe_t: Optional[float] = None
+        if mode == "SCAN":
+            self.targets = []
+            self._move_to(*self.poses[0])
+        elif not self.order:
+            print("[MISSION] ยังไม่ได้เลือกเป้าที่จะยิง")
+            self.phase = "DONE"
+        else:
+            self._begin_target()
 
     @property
     def done(self) -> bool:
         return self.phase == "DONE"
 
-    # ---------- การหมุนไปยังตำแหน่ง ----------
+    @property
+    def current(self) -> Optional[ScanTarget]:
+        if self.mode == "RUN" and self.index < len(self.order):
+            return next((t for t in self.targets if t.index == self.order[self.index]), None)
+        return None
+
+    # ---------- หันหัว ----------
     def _move_to(self, pitch: float, yaw: float):
         self.pose = (min(max(pitch, PITCH_LIMITS[0]), PITCH_LIMITS[1]), yaw)
         self.sub = "MOVE"
@@ -949,11 +1040,11 @@ class Mission:
                                  pitch_speed=MOVE_SPEED, yaw_speed=MOVE_SPEED)
 
     def _ready(self) -> bool:
-        """ อัปเดตขั้น MOVE -> SETTLE คืน True เมื่อหมุนถึงและรอภาพตามทันครบแล้ว """
+        """ MOVE -> SETTLE คืน True เมื่อหัวถึงมุมและรอภาพตามทันแล้ว """
         now = time.monotonic()
         if self.sub == "MOVE":
             if self._action is None and now - self._last_move_try >= self.MOVE_RETRY_S:
-                self._send_move()  # คำสั่งก่อนหน้าโดนปฏิเสธ (เช่น action เดิมยังไม่จบ) ลองใหม่
+                self._send_move()
             arrived = self._action is not None and self._action.is_completed
             if arrived or now - self._sub_t0 > MOVE_TIMEOUT_S:
                 if not arrived:
@@ -963,7 +1054,8 @@ class Mission:
         if self.sub == "SETTLE":
             if now - self._sub_t0 < MOVE_SETTLE_S:
                 return False
-            self.sub = "COLLECT" if self.phase == "SCAN" else "AIM"
+            self.sub = "COLLECT" if self.phase == "SCAN" else "ALIGN"
+            self._align_t0 = now
         return True
 
     # ---------- วนทุกเฟรม ----------
@@ -971,145 +1063,214 @@ class Mission:
         self.visible, self.match, self.error = [], None, None
         if self.phase == "SCAN":
             self._step_scan(fd)
-        elif self.phase == "ENGAGE":
-            self._step_engage(fd)
+        elif self.phase == "RUN":
+            self._step_run(fd)
 
     def _step_scan(self, fd: FrameData):
         pitch, yaw = self.pose
         ready = self._ready()
-        self.state = f"SCAN {self.index + 1}/{len(self.poses)} (pitch {pitch:+.0f}, yaw {yaw:+.0f}) {self.sub}"
+        self.state = f"SCAN {self.index + 1}/{len(self.poses)} (yaw {yaw:+.0f}) {self.sub}"
         if not ready:
             return
-
         w, h = fd.size
         self.visible = detect_all_colors(fd, self.app.color_ranges, self.app.blind_zones)
         for t in self.visible:
             dx, dy = pixel_to_degrees(t.cx, t.cy, w, h)
-            self.target_map.add_sighting(
-                PlannedTarget(t.color, yaw=yaw + dx, pitch=pitch + dy, area=t.area, offset=math.hypot(dx, dy)))
+            self.target_map.add_sighting(ScanTarget(t.color, t.shape, yaw=yaw + dx, pitch=pitch + dy,
+                                                    area=t.area, offset=math.hypot(dx, dy)))
         self._collected += 1
         if self._collected < SCAN_FRAMES:
             return
 
         found = self.target_map.end_pose()
-        print(f"[MISSION] 🔍 มุม {self.index + 1}/{len(self.poses)} (pitch {pitch:+.0f}°, yaw {yaw:+.0f}°): "
-              f"เห็น {found} เป้า")
+        print(f"[SCAN] มุม {self.index + 1}/{len(self.poses)} (yaw {yaw:+.0f}°): เห็น {found} เป้า")
         self._collected = 0
         self.index += 1
         if self.index < len(self.poses):
             self._move_to(*self.poses[self.index])
             return
+        self.targets = self.target_map.build_list()
+        self.app.targets = self.targets
+        print(f"[SCAN] 📋 เจอเป้า {len(self.targets)} อัน:")
+        for t in self.targets:
+            print(f"   {t.index}. {t.color.upper():<6} {SHAPE_NAMES[t.shape]:<13} yaw {t.yaw:+6.1f}°  "
+                  f"pitch {t.pitch:+5.1f}°  สไลด์ {t.lateral:+.2f} m")
+        self._move_to(0.0, 0.0)
+        self.phase = "DONE"
 
-        self.plan = self.target_map.build_plan(self.order)
-        if not self.plan:
-            print("[MISSION] ไม่พบเป้าสีที่เลือก")
+    # ---------- RUN: สไลด์ไปยิงทีละเป้า ----------
+    def _begin_target(self):
+        target = self.current
+        if target is None:
             self.phase = "DONE"
             return
-        print(f"[MISSION] 📋 แผนยิง {len(self.plan)} เป้า:")
-        for i, t in enumerate(self.plan, 1):
-            print(f"   {i}. {t.color.upper():<6} yaw {t.yaw:+6.1f}°  pitch {t.pitch:+5.1f}°")
-        self.phase = "ENGAGE"
-        self.index = 0
-        self._begin_target()
-
-    def _begin_target(self):
-        t = self.plan[self.index]
-        t.status = "ENGAGING"
+        target.status = "GOING"
+        target.shots = 0
         self._target_t0 = time.monotonic()
-        self._lost_since = None
-        self._hold_since = None
+        self._lost_since = self._hold_since = None
+        self._strafe_t = None
         self.app._reset_aim()
-        print(f"[MISSION] 🎯 เป้า {self.index + 1}/{len(self.plan)}: {t.color.upper()}")
-        # หันให้เป้าไปตกที่จุดเล็ง (ไม่ใช่กลางภาพ) จึงลบ AIM_OFFSET
-        self._move_to(t.pitch - AIM_OFFSET_Y_DEG, t.yaw - AIM_OFFSET_X_DEG)
+        print(f"[RUN] 🎯 เป้า {target.index} ({target.color.upper()} {SHAPE_NAMES[target.shape]}) "
+              f"สไลด์ไป {target.lateral:+.2f} m")
+        self._start_strafe(target.lateral - self.app.lateral)
+
+    def _start_strafe(self, delta: float):
+        """ สไลด์ข้างเป็นก้อน (chassis.move) ไม่เดินหน้า-ถอยหลัง """
+        goal = max(-STRAFE_MAX_M, min(STRAFE_MAX_M, self.app.lateral + delta))  # อยู่ในลิมิตจากจุดเริ่ม
+        delta = goal - self.app.lateral
+        self.sub = "STRAFE"
+        self._sub_t0 = time.monotonic()
+        if abs(delta) < 0.02:
+            self.sub = "ALIGN"
+            self._align_t0 = time.monotonic()
+            return
+        self._action = safe_call("chassis strafe", self.app.ep_chassis.move, x=0, y=delta, z=0,
+                                 xy_speed=STRAFE_MOVE_SPEED)
+        self.app.lateral += delta
 
     def _finish_target(self, status: str):
-        self.plan[self.index].status = status
-        print(f"[MISSION]    -> {status}")
+        target = self.current
+        if target is not None:
+            target.status = status
+            print(f"[RUN]    -> เป้า {target.index}: {status}")
         self.app._stop_gimbal()
+        self.app.stop_chassis()
         self.index += 1
-        if self.index < len(self.plan):
+        if self.index < len(self.order):
             self._begin_target()
         else:
+            self._finish_run()
+
+    def _finish_run(self):
+        if RETURN_TO_START and abs(self.app.lateral) > 0.02:
+            print(f"[RUN] สไลด์กลับจุดเริ่ม ({-self.app.lateral:+.2f} m)")
+            action = safe_call("chassis home", self.app.ep_chassis.move, x=0, y=-self.app.lateral, z=0,
+                               xy_speed=STRAFE_MOVE_SPEED)
+            if action is not None:
+                safe_call("home wait", action.wait_for_completed, timeout=MOVE_TIMEOUT_S + 4)
+            self.app.lateral = 0.0
+        self.app._stop_gimbal()
+        self.app.stop_chassis()
+        self.phase = "DONE"
+
+    def _step_run(self, fd: FrameData):
+        app, target = self.app, self.current
+        if target is None:
             self.phase = "DONE"
-
-    def _step_engage(self, fd: FrameData):
-        app = self.app
-        t = self.plan[self.index]
+            return
         now = time.monotonic()
-        label = f"TARGET {self.index + 1}/{len(self.plan)} {t.color.upper()}"
-        if now - self._target_t0 > ENGAGE_TIMEOUT_S:
-            self._finish_target("SKIPPED")
-            return
-        if not self._ready():
-            self.state = f"{label} {self.sub}"
+        head = f"TARGET {self.index + 1}/{len(self.order)} #{target.index} {target.label}"
+
+        if self.sub == "STRAFE":  # รอ chassis.move เสร็จ
+            done = self._action is None or self._action.is_completed
+            self.state = f"{head} STRAFE"
+            if done or now - self._sub_t0 > STRAFE_TIMEOUT_S:
+                app.stop_chassis()
+                self.sub, self._sub_t0, self._align_t0 = "ALIGN", now, now
             return
 
-        # หาเป้าสีนี้ที่ใกล้จุดอ้างอิงที่สุด: เฟรมแรกใช้จุดเล็ง เฟรมต่อไปใช้ตำแหน่งที่เจอล่าสุด (ไม่กระโดดไปเป้าข้างๆ)
-        # และขนาดต้องใกล้กับตอนกวาดหา (แบบโค้ดเพื่อน) กันสลับไปเล็งป้ายสีเดียวกันที่อยู่ติดกัน
         w, h = fd.size
-        mask = build_mask(fd.hsv, app.color_ranges[t.color], app.blind_zones)
-        self.visible = find_targets(fd, mask, t.color)
-        ref = self._last_match_deg or (AIM_OFFSET_X_DEG, AIM_OFFSET_Y_DEG)
-        best, best_deg, best_dist = None, None, MATCH_RADIUS_DEG
-        for cand in self.visible:
-            if not MATCH_AREA_RATIO[0] < cand.area / t.area < MATCH_AREA_RATIO[1]:
-                continue
-            deg = pixel_to_degrees(cand.cx, cand.cy, w, h)
-            dist = math.hypot(deg[0] - ref[0], deg[1] - ref[1])
-            if dist < best_dist:
-                best, best_deg, best_dist = cand, deg, dist
+        mask = build_mask(fd.hsv, app.color_ranges[target.color], app.blind_zones)
+        self.visible = find_targets(fd, mask, target.color)
+        best = self._pick(self.visible, w, h, target)
 
         if best is None:
+            app.stop_chassis()
             app._stop_gimbal()
-            self._last_match_deg = None
-            self._hold_since = None
+            self._last_match_deg, self._hold_since = None, None
             if self._lost_since is None:
                 self._lost_since = now
             elif now - self._lost_since > LOST_REPOINT_S:
                 self._lost_since = None
-                self._move_to(t.pitch - AIM_OFFSET_Y_DEG, t.yaw - AIM_OFFSET_X_DEG)
-            self.state = f"{label} LOST"
+                self._move_to(0.0, 0.0)  # หันหัวกลับตรงแล้วหาใหม่
+            self.state = f"{head} LOST"
+            if now - self._target_t0 > RUN_TARGET_TIMEOUT_S:
+                self._finish_target("SKIPPED")
             return
 
         self._lost_since = None
-        self.match, self._last_match_deg = best, best_deg
-        err_x, err_y = best_deg[0] - AIM_OFFSET_X_DEG, best_deg[1] - AIM_OFFSET_Y_DEG
+        self.match, self._last_match_deg = best, pixel_to_degrees(best.cx, best.cy, w, h)
+        err_x = self._last_match_deg[0] - AIM_OFFSET_X_DEG
+        err_y = self._last_match_deg[1] - AIM_OFFSET_Y_DEG
         self.error = (err_x, err_y)
+
+        if self.sub == "ALIGN":
+            # สไลด์ตัวรถจนเป้ามาอยู่ตรงหน้า (หัวหันตรง) แล้วค่อยเล็งด้วยหัว
+            self.state = f"{head} ALIGN  off {err_x:+.1f} deg"
+            if abs(err_x) <= STRAFE_TOL_DEG or now - self._align_t0 > STRAFE_TIMEOUT_S:
+                app.stop_chassis()
+                self._strafe_t = None
+                self.sub = "AIM"
+                app._reset_aim()
+                return
+            speed = STRAFE_KP * TARGET_DISTANCE_M * math.tan(math.radians(err_x))
+            speed = max(-STRAFE_SPEED, min(STRAFE_SPEED, speed))
+            if abs(self.app.lateral) >= STRAFE_MAX_M and speed * self.app.lateral > 0:
+                speed = 0.0  # ไกลจากจุดเริ่มเกินลิมิตแล้ว
+            app.drive_chassis(speed)
+            if self._strafe_t is not None:
+                app.lateral += speed * (now - self._strafe_t)
+            self._strafe_t = now
+            return
+
+        # AIM: เล็งละเอียดด้วยหัว + ยิงตามเกณฑ์ล็อกเดิม
         safe_call("gimbal drive", app.ep_gimbal.drive_speed,
                   pitch_speed=app.pid_pitch.compute(err_y), yaw_speed=app.pid_yaw.compute(err_x))
-
         fire_state, should_fire = app.fire_ctrl.evaluate(err_x, err_y, app.is_tuning)
-        self.state = f"{label} {fire_state}"
+        self.state = f"{head} {fire_state}"
+        if now - self._target_t0 > RUN_TARGET_TIMEOUT_S:
+            self._finish_target("SKIPPED")
+            return
         if should_fire:
+            if SHAPE_CHECK and best.shape != target.shape and best.shape != "?":
+                print(f"[RUN] ⚠️ เป้า {target.index} ที่เล็งอยู่ดูเป็น {SHAPE_NAMES[best.shape]} "
+                      f"แต่ในรายการเป็น {SHAPE_NAMES[target.shape]}")
             if app._fire():
-                t.shots += 1
-            if t.shots >= SHOTS_PER_TARGET:
-                self._finish_target("FIRED")
+                target.shots += 1
+            if target.shots >= SHOTS_PER_TARGET:
+                self._finish_target("SHOT")
             return
         if app.fire_ctrl.settled and not app.fire_ctrl.armed:
-            # Auto-Fire ปิด = ซ้อมเล็ง: ค้างให้ดูสักครู่แล้วไปเป้าถัดไป
-            if self._hold_since is None:
-                self._hold_since = now
-            elif now - self._hold_since >= DRY_RUN_HOLD_S:
-                self._finish_target("AIMED-SAFE")
+            self._hold_since = self._hold_since or now
+            if now - self._hold_since >= DRY_RUN_HOLD_S:
+                self._finish_target("AIMED")
         else:
             self._hold_since = None
 
+    def _pick(self, cands: List[Target], w: int, h: int, target: ScanTarget) -> Optional[Target]:
+        """ เลือกเป้าที่ใกล้จุดอ้างอิงที่สุด: เฟรมแรกใช้จุดเล็ง เฟรมต่อไปใช้ตำแหน่งที่เจอล่าสุด
+        และขนาดต้องใกล้กับตอนกวาด กันสลับไปเป้าสีเดียวกันที่อยู่ข้างๆ
+        """
+        ref = self._last_match_deg or (AIM_OFFSET_X_DEG, AIM_OFFSET_Y_DEG)
+        best, best_dist = None, MATCH_RADIUS_DEG if self.sub != "ALIGN" else ALIGN_MATCH_RADIUS_DEG
+        for cand in cands:
+            if not MATCH_AREA_RATIO[0] < cand.area / target.area < MATCH_AREA_RATIO[1]:
+                continue
+            deg = pixel_to_degrees(cand.cx, cand.cy, w, h)
+            dist = math.hypot(deg[0] - ref[0], deg[1] - ref[1])
+            if self.sub == "ALIGN" and cand.shape != target.shape and cand.shape != "?":
+                dist += SHAPE_MISMATCH_PENALTY_DEG  # รูปทรงไม่ตรง ให้ความสำคัญน้อยลง
+            if dist < best_dist:
+                best, best_dist = cand, dist
+        return best
+
     # ---------- สรุปผล ----------
     def progress_lines(self, per_line: int = 6) -> List[str]:
-        tokens = [f"{i}.{t.color[0].upper()}:{self.STATUS_SHORT[t.status]}" for i, t in enumerate(self.plan, 1)]
+        items = [t for t in self.targets if t.index in self.order] if self.mode == "RUN" else self.targets
+        tokens = [f"#{t.index}{t.label.replace(' ', '')}:{self.STATUS_SHORT.get(t.status, '..')}" for t in items]
         return ["  ".join(tokens[i:i + per_line]) for i in range(0, len(tokens), per_line)]
 
     def print_summary(self, aborted: bool = False):
-        print("\n=== สรุปภารกิจ" + (" (ถูกยกเลิก)" if aborted else "") + " ===")
-        if not self.plan:
-            print("  ยังกวาดหาเป้าไม่เสร็จ" if self.phase == "SCAN" else "  ไม่พบเป้าสีที่เลือก")
+        print("\n=== สรุป" + (" (ถูกยกเลิก)" if aborted else "") + " ===")
+        if self.mode == "SCAN":
+            print(f"  เจอเป้า {len(self.targets)} อัน")
             return
-        for i, t in enumerate(self.plan, 1):
-            print(f"  {i}. {t.color.upper():<6} yaw {t.yaw:+6.1f}°  pitch {t.pitch:+5.1f}°  -> {t.status}")
-        fired = sum(t.status == "FIRED" for t in self.plan)
-        print(f"  ยิงแล้ว {fired}/{len(self.plan)} เป้า\n")
+        for i in self.order:
+            t = next((t for t in self.targets if t.index == i), None)
+            if t is not None:
+                print(f"  #{t.index} {t.color.upper():<6} {SHAPE_NAMES[t.shape]:<13} -> {t.status}")
+        shot = sum(1 for t in self.targets if t.index in self.order and t.status == "SHOT")
+        print(f"  ยิงแล้ว {shot}/{len(self.order)} เป้า\n")
 
 
 # ==========================================
@@ -1135,9 +1296,13 @@ class AutoAimApp:
         self.running = True
         self.tune_tab = 0              # หน้า TUNE: 0-3 = สีตาม COLOR_ORDER, 4 = ตรวจรวมทุกสี
         self._calibrating = False      # อยู่ในขั้น calibrate เต็ม (SETUP -> TUNE)
-        self._order_fresh = True       # คลิกสีแรกหลังเข้าหน้า READY = เริ่มเรียงลำดับใหม่
         self._ready_since = 0.0
         self._last_result: List[str] = []
+        self.targets: List[ScanTarget] = []   # เป้าที่กวาดเจอ เรียงเบอร์ 1..N จากซ้ายไปขวา
+        self.selection: List[int] = []        # เบอร์เป้าที่เลือกจะยิง (เรียงตามที่กด)
+        self.lateral = 0.0                    # ตำแหน่งซ้าย-ขวาของหุ่นเทียบจุดเริ่ม (ม.)
+        self.chassis_yaw = 0.0                # มุมหัวรถจาก IMU (ใช้คุมไม่ให้เบี้ยวตอนสไลด์)
+        self.heading_ref: Optional[float] = None
 
         self.pid_yaw = PIDController(**YAW_PID)
         self.pid_pitch = PIDController(**PITCH_PID)
@@ -1147,6 +1312,7 @@ class AutoAimApp:
         self.ep_gimbal = None
         self.ep_camera = None
         self.ep_blaster = None
+        self.ep_chassis = None
         self.leds: Optional[LedManager] = None
         self._stream_started = False
 
@@ -1184,7 +1350,10 @@ class AutoAimApp:
         self.ep_gimbal = self.ep_robot.gimbal
         self.ep_camera = self.ep_robot.camera
         self.ep_blaster = self.ep_robot.blaster
+        self.ep_chassis = self.ep_robot.chassis
         safe_call("set robot mode", self.ep_robot.set_robot_mode, mode=ROBOT_MODE)
+        # IMU ใช้คุมหัวรถไม่ให้เบี้ยวตอนสไลด์ข้าง
+        safe_call("sub attitude", self.ep_chassis.sub_attitude, freq=20, callback=self._on_attitude)
 
         # ดับไฟ Top + Blaster ก่อนเปิดกล้อง แล้วใช้แค่ไฟฐานล้อแสดงสถานะ
         self.leds = LedManager(self.ep_robot.led, self.ep_blaster)
@@ -1196,9 +1365,32 @@ class AutoAimApp:
         self._stream_started = True
         return True
 
+    def _on_attitude(self, info):
+        self.chassis_yaw = info[0]
+        if self.heading_ref is None:
+            self.heading_ref = info[0]
+
+    def drive_chassis(self, y_speed: float):
+        """ สไลด์ข้างอย่างเดียว (x = 0) + คุมหัวรถให้ตรงเดิมด้วย IMU """
+        z = 0.0
+        if self.heading_ref is not None:
+            error = self.chassis_yaw - self.heading_ref
+            while error > 180:
+                error -= 360
+            while error <= -180:
+                error += 360
+            z = -YAW_HOLD_KP * error
+        safe_call("chassis strafe", self.ep_chassis.drive_speed, x=0, y=y_speed, z=z)
+
+    def stop_chassis(self):
+        safe_call("chassis stop", self.ep_chassis.drive_wheels, w1=0, w2=0, w3=0, w4=0)
+
     def _shutdown(self):
         print("\n=== กำลังปิดระบบอย่างปลอดภัย... ===")
         self.fire_ctrl.armed = False  # ปลดอาวุธก่อนทำอย่างอื่น
+        if self.ep_chassis is not None:
+            self.stop_chassis()
+            safe_call("unsub attitude", self.ep_chassis.unsub_attitude)
         if self.mission is not None:
             self.mission.print_summary(aborted=True)
             self.mission = None
@@ -1242,7 +1434,9 @@ class AutoAimApp:
         if self.screen != SCREEN_MISSION or self.is_tuning or not self.fire_ctrl.armed:
             return False
         safe_call("gimbal stop", self.ep_gimbal.drive_speed, pitch_speed=0, yaw_speed=0)
-        print(f"🔥 ยิงเป้า {self.mission.plan[self.mission.index].color.upper()}")
+        target = self.mission.current
+        print(f"🔥 ยิงเป้า #{target.index} {target.color.upper()} {SHAPE_NAMES[target.shape]}"
+              if target is not None else "🔥 ยิง")
         safe_call("blaster fire", self.ep_blaster.fire, fire_type=blaster.WATER_FIRE, times=1)
         # ไม่สั่งไฟ Blaster กระพริบ; ดับไฟซ้ำเผื่อ firmware เปิดเองตอนยิง
         self.leds.silence_gimbal_lights()
@@ -1295,35 +1489,47 @@ class AutoAimApp:
             self._recenter("กลับหน้า READY")
         else:
             self._stop_gimbal()
-        self._order_fresh = True
         self._ready_since = time.monotonic()
+        self.stop_chassis()
         self._update_status_led()
-        self._print_order()
+        self._print_selection()
 
     # ---------- ภารกิจ ----------
-    def _start_mission(self, fire: bool):
-        if not self.fire_order:
-            print(">> ⚠️ ยังไม่ได้เลือกสีที่จะยิง")
+    def _start_scan(self):
+        """ กวาดหัวหาเป้าทุกสี/ทุกรูปทรง แล้วให้เบอร์เรียงจากซ้ายไปขวา """
+        self._stop_gimbal()
+        self.stop_chassis()
+        self.selection = []
+        self.fire_ctrl.armed = False
+        self.screen = SCREEN_MISSION
+        self.mission = Mission(self, "SCAN")
+        print(f">> 🔍 กวาดหาเป้า {len(self.mission.poses)} มุม")
+        self._update_status_led()
+
+    def _start_run(self, fire: bool):
+        if not self.targets:
+            print(">> ⚠️ ยังไม่ได้กวาดหาเป้า (กด s)")
+            return
+        if not self.selection:
+            print(">> ⚠️ ยังไม่ได้เลือกเบอร์เป้าที่จะยิง (กดเลข 1-9 หรือคลิกที่รายการ)")
             return
         if time.monotonic() - self._ready_since < START_KEY_GUARD_S:
             return  # ไม่รับ ENTER ที่กดซ้ำ/ค้างมาจากหน้าก่อน กันเริ่มยิงโดยไม่ตั้งใจ
-
-        self._save()  # จำลำดับยิงไว้เป็นค่าเริ่มต้นของรอบหน้า
         self._stop_gimbal()
         self.fire_ctrl.armed = fire
         self.screen = SCREEN_MISSION
-        self.mission = Mission(self, self.fire_order)
-        print(f">> 🚀 {'เริ่มยิง' if fire else 'ซ้อมเล็ง (ไม่ยิง)'} ตามลำดับ {self._order_text()} "
-              f"| กวาดหาเป้า {len(self.mission.poses)} มุม")
+        self.mission = Mission(self, "RUN", fire=fire, order=list(self.selection))
+        picked = " > ".join(f"#{i}" for i in self.selection)
+        print(f">> 🚀 {'เริ่มยิง' if fire else 'ซ้อมเล็ง (ไม่ยิง)'} เป้า {picked}")
         self._update_status_led()
 
     def _mission_result(self, aborted: bool) -> List[str]:
         m = self.mission
-        fired = sum(t.status == "FIRED" for t in m.plan)
-        head = f"Last mission{' (STOPPED)' if aborted else ''}: fired {fired}/{len(m.plan)} target(s)"
-        if not m.plan:
-            head += " - stopped while scanning" if m.phase == "SCAN" else " - no target of the chosen colors"
-        return [head] + m.progress_lines(per_line=8)
+        if m.mode == "SCAN":
+            return [f"Last scan{' (STOPPED)' if aborted else ''}: found {len(self.targets)} target(s)"]
+        shot = sum(1 for t in m.targets if t.index in m.order and t.status == "SHOT")
+        head = f"Last run{' (STOPPED)' if aborted else ''}: shot {shot}/{len(m.order)} target(s)"
+        return [head] + m.progress_lines(per_line=6)
 
     def _abort_mission(self):
         self._last_result = self._mission_result(aborted=True)
@@ -1342,32 +1548,35 @@ class AutoAimApp:
         self._update_status_led()
 
     # ---------- ลำดับยิง ----------
-    def _toggle_order(self, color: str):
-        if self._order_fresh:
-            self.fire_order = []  # คลิกสีแรกหลังเข้าหน้า READY = เริ่มเรียงลำดับใหม่
-            self._order_fresh = False
-        if color in self.fire_order:
-            self.fire_order.remove(color)  # คลิกสีที่เลือกไว้แล้ว = เอาออก
+    def _toggle_target(self, index: int):
+        """ เลือก/ยกเลิกเป้าตามเบอร์ ลำดับที่กด = ลำดับที่จะไปยิง """
+        if not any(t.index == index for t in self.targets):
+            return
+        if index in self.selection:
+            self.selection.remove(index)
         else:
-            self.fire_order.append(color)
-        self._print_order()
+            self.selection.append(index)
+        self._print_selection()
 
-    def _undo_order(self):
-        self._order_fresh = False
-        if self.fire_order:
-            self.fire_order.pop()
-        self._print_order()
+    def _undo_selection(self):
+        if self.selection:
+            self.selection.pop()
+        self._print_selection()
 
-    def _clear_order(self):
-        self._order_fresh = False
-        self.fire_order = []
-        self._print_order()
+    def _clear_selection(self):
+        self.selection = []
+        self._print_selection()
 
-    def _order_text(self, sep: str = " -> ") -> str:
-        return sep.join(c.upper() for c in self.fire_order)
+    def _select_all(self):
+        self.selection = [t.index for t in self.targets]
+        self._print_selection()
 
-    def _print_order(self):
-        print(f">> ลำดับยิง: {self._order_text() or '(ยังไม่ได้เลือก)'}")
+    def _selection_text(self, sep: str = " > ") -> str:
+        by_index = {t.index: t for t in self.targets}
+        return sep.join(f"#{i} {by_index[i].label}" for i in self.selection if i in by_index)
+
+    def _print_selection(self):
+        print(f">> เป้าที่จะยิง: {self._selection_text() or '(ยังไม่ได้เลือก)'}")
 
     # ---------- ปุ่ม (เมาส์ + คีย์บอร์ด ใช้ action เดียวกัน) ----------
     def _key_to_action(self, key: int) -> Optional[str]:
@@ -1376,13 +1585,14 @@ class AutoAimApp:
             return "quit"
         enter = key in (13, 10)
         if self.screen == SCREEN_READY:
-            if ch in KEY_TO_COLOR:
-                return "order:" + KEY_TO_COLOR[ch]
+            if ch.isdigit() and ch != "0":
+                return "pick:" + ch
             if ch == "u" or key in (8, 127):  # Backspace บน macOS = 127
                 return "undo"
             if enter:
                 return "start"
-            return {"x": "clear", "d": "dry", "t": "tune", "c": "center"}.get(ch)
+            return {"s": "scan", "0": "clear", "a": "all", "d": "dry",
+                    "t": "tune", "c": "center"}.get(ch)
         if self.screen == SCREEN_MISSION:
             if ch == "x" or key == 32:
                 return "stop"
@@ -1405,16 +1615,20 @@ class AutoAimApp:
         if action == "quit":
             self.running = False
         elif self.screen == SCREEN_READY:
-            if action.startswith("order:"):
-                self._toggle_order(action.split(":", 1)[1])
+            if action.startswith("pick:"):
+                self._toggle_target(int(action.split(":", 1)[1]))
             elif action == "undo":
-                self._undo_order()
+                self._undo_selection()
             elif action == "clear":
-                self._clear_order()
+                self._clear_selection()
+            elif action == "all":
+                self._select_all()
+            elif action == "scan":
+                self._start_scan()
             elif action == "start":
-                self._start_mission(fire=True)
+                self._start_run(fire=True)
             elif action == "dry":
-                self._start_mission(fire=False)
+                self._start_run(fire=False)
             elif action == "tune":
                 self._enter_tune(calibrating=False)
             elif action == "calibrate":
@@ -1557,13 +1771,15 @@ class AutoAimApp:
         if self.screen == SCREEN_TUNE:
             return ("CALIBRATE 2/2: COLORS" if self._calibrating else "TUNE COLORS"), UI_ORANGE
         if self.screen == SCREEN_MISSION:
-            return ("MISSION - FIRING", UI_RED) if self.fire_ctrl.armed else ("MISSION - DRY RUN", UI_BLUE)
+            if self.mission is not None and self.mission.mode == "SCAN":
+                return "SCANNING TARGETS", UI_BLUE
+            return ("RUN - FIRING", UI_RED) if self.fire_ctrl.armed else ("RUN - DRY (NO FIRE)", UI_BLUE)
         return "READY", UI_GREEN
 
     def _draw_panel(self, canvas, state: str, error):
         """ แผงขวา: สถานะ + ปุ่มของหน้าจอปัจจุบัน """
         px, bw = VIEW_W + 16, PANEL_W - 32
-        label(canvas, "ROBOMASTER AUTO-AIM", px, 28, UI_TEXT, 0.6, 2)
+        label(canvas, "ROBOMASTER SHOOT AND RUN", px, 28, UI_TEXT, 0.55, 2)
         badge, badge_color = self._screen_badge()
         cv2.rectangle(canvas, (px, 40), (px + bw, 70), badge_color, -1)
         label(canvas, badge, px + 10, 61, text_color_for(badge_color), 0.55, 1, max_w=bw - 20)
@@ -1591,28 +1807,36 @@ class AutoAimApp:
 
     def _panel_ready(self, canvas, px, y, bw):
         half = (bw - 8) // 2
-        label(canvas, "FIRE ORDER - click colors in order", px, y, UI_DIM, 0.45, max_w=bw)
-
-        def caption(color):
-            short = COLOR_SHORT[color]
-            return f"{self.fire_order.index(color) + 1}:{short}" if color in self.fire_order else short
-
-        self._color_chips(canvas, px, y + 10, bw, "order:", lambda c: c in self.fire_order, caption)
-        y += 72
-        label(canvas, f"Order: {self._order_text(' > ') or '(none)'}", px, y, (0, 255, 255), 0.5, 1, max_w=bw)
+        self.ui.button(canvas, px, y, bw, 40, f"SCAN TARGETS (s)   found: {len(self.targets)}", "scan", UI_ORANGE)
+        y += 50
+        label(canvas, "PICK TARGETS (click or 1-9), order = firing order", px, y, UI_DIM, 0.45, max_w=bw)
+        y += 8
+        # ปุ่มเบอร์เป้า: เลขเป้า + สี + รูปทรง เรียงจากซ้ายไปขวาเหมือนที่เห็นจริง
+        per_row, chip_w = 4, (bw - 3 * 6) // 4
+        for i, target in enumerate(self.targets[:12]):
+            row, col = divmod(i, per_row)
+            picked = target.index in self.selection
+            order = f"{self.selection.index(target.index) + 1}) " if picked else ""
+            self.ui.button(canvas, px + col * (chip_w + 6), y + row * 40, chip_w, 34,
+                           f"{order}{target.index}.{target.label}", f"pick:{target.index}",
+                           DISPLAY_COLORS[target.color] if picked else dim(DISPLAY_COLORS[target.color]),
+                           selected=picked)
+        y += 40 * max(1, (min(len(self.targets), 12) + per_row - 1) // per_row) + 4
+        label(canvas, f"Firing: {self._selection_text() or '(none - pick targets)'}", px, y, (0, 255, 255),
+              0.45, 1, max_w=bw)
         y += 12
-        self.ui.button(canvas, px, y, half, 34, "UNDO (u)", "undo")
-        self.ui.button(canvas, px + half + 8, y, half, 34, "CLEAR (x)", "clear")
-        y += 48
-        can_start = bool(self.fire_order)
-        self.ui.button(canvas, px, y, bw, 58, "START FIRING (ENTER)", "start", UI_RED, enabled=can_start)
-        y += 68
-        self.ui.button(canvas, px, y, bw, 38, "DRY RUN - AIM ONLY (d)", "dry", UI_BLUE, enabled=can_start)
-        y += 56
-        self.ui.button(canvas, px, y, half, 38, "TUNE COLORS (t)", "tune")
-        self.ui.button(canvas, px + half + 8, y, half, 38, "CALIBRATE ALL", "calibrate")
-        y += 48
-        self.ui.button(canvas, px, y, bw, 36, "RECENTER GIMBAL (c)", "center")
+        self.ui.button(canvas, px, y, half, 32, "SELECT ALL (a)", "all", enabled=bool(self.targets))
+        self.ui.button(canvas, px + half + 8, y, half, 32, "CLEAR (0)", "clear", enabled=bool(self.selection))
+        y += 44
+        can_start = bool(self.selection)
+        self.ui.button(canvas, px, y, bw, 52, "GO AND SHOOT (ENTER)", "start", UI_RED, enabled=can_start)
+        y += 60
+        self.ui.button(canvas, px, y, bw, 34, "DRY RUN - MOVE, NO FIRE (d)", "dry", UI_BLUE, enabled=can_start)
+        y += 44
+        self.ui.button(canvas, px, y, half, 34, "TUNE COLORS (t)", "tune")
+        self.ui.button(canvas, px + half + 8, y, half, 34, "CALIBRATE ALL", "calibrate")
+        y += 42
+        self.ui.button(canvas, px, y, bw, 32, "RECENTER GIMBAL (c)", "center")
 
     def _panel_mission(self, canvas, px, y, bw):
         self.ui.button(canvas, px, y, bw, 70, "STOP (x / SPACE)", "stop", UI_RED)
@@ -1624,7 +1848,9 @@ class AutoAimApp:
         y += 56
         self.ui.button(canvas, px, y, bw, 38, "STOP + RECENTER (c)", "stop_center")
         y += 60
-        label(canvas, f"Order: {self._order_text(' > ')}", px, y, (0, 255, 255), 0.5, 1, max_w=bw)
+        label(canvas, f"Firing: {self._selection_text()}", px, y, (0, 255, 255), 0.45, 1, max_w=bw)
+        y += 20
+        label(canvas, f"Robot slide: {self.lateral:+.2f} m from start", px, y, UI_DIM, 0.45)
 
     def _panel_setup(self, canvas, px, y, bw):
         half = (bw - 8) // 2
@@ -1696,14 +1922,23 @@ class AutoAimApp:
             keys = "r/g/b/y = tune color   p = back   t = save & finish   q = quit"
         elif self.screen == SCREEN_MISSION:
             m = self.mission
-            lines = [(m.state, UI_TEXT)] + [(text, (0, 255, 255)) for text in m.progress_lines(per_line=8)]
+            lines = [(m.state, UI_TEXT)] + [(text, (0, 255, 255)) for text in m.progress_lines(per_line=6)]
+            if m.mode == "RUN":
+                lines.append((f"Robot slide {self.lateral:+.2f} m from start "
+                              f"(target distance set to {TARGET_DISTANCE_M:.2f} m)", UI_DIM))
             keys = "x / SPACE = stop now   s = fire on/off   c = stop + recenter   q = quit"
         else:
-            lines = [(f"In view: {counts}", (0, 255, 255)),
-                     ("Click color chips (or r/g/b/y) in firing order, then START FIRING.", UI_TEXT),
-                     ("The robot scans around first, then fires at every target of those colors.", UI_TEXT)]
+            if self.targets:
+                lines = [(f"SCANNED {len(self.targets)} TARGETS (numbered left to right)", (0, 255, 255))]
+                lines += [("   ".join(f"#{t.index} {t.color.upper()} {SHAPE_NAMES[t.shape]} "
+                                      f"(slide {t.lateral:+.2f}m)" for t in self.targets[i:i + 3]), UI_TEXT)
+                          for i in range(0, min(len(self.targets), 9), 3)]
+            else:
+                lines = [(f"In view: {counts}", (0, 255, 255)),
+                         ("Press SCAN TARGETS (s) first: the head sweeps and numbers every target.", UI_TEXT),
+                         ("Then pick the numbers the teacher asked for and press GO AND SHOOT.", UI_TEXT)]
             lines += [(text, UI_DIM) for text in self._last_result]
-            keys = "r/g/b/y = order  u = undo  x = clear  ENTER = fire  d = dry run  t = tune  c = center  q = quit"
+            keys = "s = scan  1-9 = pick  a = all  0 = clear  u = undo  ENTER = go+fire  d = dry  t = tune  q = quit"
 
         for i, (text, color) in enumerate(lines[:6]):
             label(canvas, text, 16, y0 + 26 + i * 22, color, 0.5, 1, max_w=VIEW_W - 32)
@@ -1744,7 +1979,7 @@ class AutoAimApp:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="RoboMaster EP ยิงเป้าตามลำดับสีอัตโนมัติ")
+    parser = argparse.ArgumentParser(description="RoboMaster EP: กวาดหาเป้าหลายสี/รูปทรง แล้วสไลด์ไปยิงเป้าที่เลือก")
     parser.add_argument("--calibrate", action="store_true",
                         help="เริ่มที่หน้า calibrate (วาดพื้นที่ตาบอด + จูนสีครบทุกสี) รันครั้งแรกจะทำให้อัตโนมัติ")
     AutoAimApp(calibrate=parser.parse_args().calibrate).run()

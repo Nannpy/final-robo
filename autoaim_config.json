@@ -35,9 +35,6 @@
   },
   "user_blind_zones": [],
   "fire_order": [
-    "blue",
-    "red",
-    "green",
-    "yellow"
+    "yellow:rectangle"
   ]
 }
